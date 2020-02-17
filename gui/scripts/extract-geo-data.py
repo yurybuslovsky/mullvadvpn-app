@@ -44,11 +44,13 @@ LOCALE_MAPPING = {
 def extract_geometry():
   input_path = get_shape_path("ne_50m_admin_0_countries")
   output_path = path.join(OUT_DIR, "geometry.json")
+  geojson_output_path = path.join(OUT_DIR, "geometry.geo.json")
 
   features = []
   with fiona.open(input_path) as source:
     for feat in source:
-      del feat["properties"]
+      # iOS requires properties field to be present even if empty
+      feat["properties"] = {}
       geometry = feat["geometry"]
       feat["bbox"] = shape(geometry).bounds
       features.append(feat)
@@ -57,6 +59,11 @@ def extract_geometry():
     "type": "FeatureCollection",
     "features": features
   }
+
+  with open(geojson_output_path, 'w') as outfile:
+    json.dump(my_layer, outfile)
+
+  print(c.green("Saved geojson data to {}".format(geojson_output_path)))
 
   p = Popen(
     ['geo2topo', '-q', '5e3', 'geometry=-', '-o', output_path],

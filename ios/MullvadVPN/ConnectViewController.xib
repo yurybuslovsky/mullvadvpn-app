@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="16097.2" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="17701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="retina6_1" orientation="portrait" appearance="light"/>
     <dependencies>
         <deployment identifier="iOS"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="16087"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="17703"/>
         <capability name="Named colors" minToolsVersion="9.0"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -15,6 +15,7 @@
                 <outlet property="cityLabel" destination="8Qe-Us-gxU" id="qAs-MJ-Quv"/>
                 <outlet property="connectionPanel" destination="h6t-ky-9gm" id="hOY-G9-IVQ"/>
                 <outlet property="countryLabel" destination="neK-xr-40H" id="tNC-OD-PTx"/>
+                <outlet property="mapView" destination="wjr-J0-oEH" id="9cX-mS-G5H"/>
                 <outlet property="secureLabel" destination="dus-AY-JC0" id="PMW-GI-4ga"/>
                 <outlet property="view" destination="bFH-8p-vRl" id="jVw-4H-ccF"/>
             </connections>
@@ -24,6 +25,12 @@
             <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
             <subviews>
+                <mapView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" mapType="standard" rotateEnabled="NO" pitchEnabled="NO" showsBuildings="NO" showsCompass="NO" showsPointsOfInterest="NO" translatesAutoresizingMaskIntoConstraints="NO" id="wjr-J0-oEH">
+                    <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                    <connections>
+                        <outlet property="delegate" destination="-1" id="Tc4-e5-yOc"/>
+                    </connections>
+                </mapView>
                 <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" spacing="8" translatesAutoresizingMaskIntoConstraints="NO" id="SON-pD-ZGn">
                     <rect key="frame" x="24" y="502" width="366" height="212"/>
                     <subviews>
@@ -91,17 +98,21 @@
                     </constraints>
                 </view>
             </subviews>
+            <viewLayoutGuide key="safeArea" id="Rzj-xL-crv"/>
             <color key="backgroundColor" name="Primary"/>
             <constraints>
+                <constraint firstItem="wjr-J0-oEH" firstAttribute="leading" secondItem="bFH-8p-vRl" secondAttribute="leading" id="3PG-RC-Yvp"/>
+                <constraint firstAttribute="trailing" secondItem="wjr-J0-oEH" secondAttribute="trailing" id="Bud-hB-Wgp"/>
                 <constraint firstItem="Rzj-xL-crv" firstAttribute="bottom" secondItem="82Y-rR-Igf" secondAttribute="bottom" constant="24" id="D4A-Ij-Eip"/>
                 <constraint firstItem="Rzj-xL-crv" firstAttribute="trailing" secondItem="82Y-rR-Igf" secondAttribute="trailing" constant="24" id="DPX-JT-0Bx"/>
                 <constraint firstItem="SON-pD-ZGn" firstAttribute="leading" secondItem="bFH-8p-vRl" secondAttribute="leadingMargin" id="LSL-Go-oXb"/>
                 <constraint firstItem="82Y-rR-Igf" firstAttribute="leading" secondItem="Rzj-xL-crv" secondAttribute="leading" constant="24" id="UWY-XY-Njv"/>
                 <constraint firstAttribute="trailingMargin" secondItem="SON-pD-ZGn" secondAttribute="trailing" id="Vhs-Sr-QUI"/>
                 <constraint firstItem="82Y-rR-Igf" firstAttribute="top" secondItem="SON-pD-ZGn" secondAttribute="bottom" constant="24" id="WhU-py-uqj"/>
+                <constraint firstAttribute="bottom" secondItem="wjr-J0-oEH" secondAttribute="bottom" id="bPk-xf-Vq6"/>
+                <constraint firstItem="wjr-J0-oEH" firstAttribute="top" secondItem="bFH-8p-vRl" secondAttribute="top" id="i9X-Ad-e7C"/>
             </constraints>
             <edgeInsets key="layoutMargins" top="0.0" left="24" bottom="24" right="24"/>
-            <viewLayoutGuide key="safeArea" id="Rzj-xL-crv"/>
             <point key="canvasLocation" x="139" y="153"/>
         </view>
     </objects>
