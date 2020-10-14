@@ -9,7 +9,7 @@
 import Foundation
 import Logging
 
-func initLoggingSystem(bundleIdentifier: String) {
+func initLoggingSystem(bundleIdentifier: String, rotateLog: Bool) {
     let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ApplicationConfiguration.securityGroupIdentifier)!
     let logsDirectoryURL = containerURL.appendingPathComponent("Logs", isDirectory: true)
     let logFileName = "\(bundleIdentifier).log"
@@ -19,7 +19,10 @@ func initLoggingSystem(bundleIdentifier: String) {
     try? FileManager.default.createDirectory(at: logsDirectoryURL, withIntermediateDirectories: false, attributes: nil)
 
     // Rotate log
-    let logRotationResult = LogRotation.rotateLog(logsDirectory: logsDirectoryURL, logFileName: logFileName)
+    var logRotationResult: Result<(), LogRotation.Error>?
+    if rotateLog {
+        logRotationResult = LogRotation.rotateLog(logsDirectory: logsDirectoryURL, logFileName: logFileName)
+    }
 
     // Create an array of log output streams
     var streams: [TextOutputStream] = []

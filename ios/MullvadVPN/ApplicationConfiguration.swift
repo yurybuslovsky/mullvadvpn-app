@@ -31,8 +31,13 @@ class ApplicationConfiguration {
         return Self.containerURL?.appendingPathComponent("Logs/net.mullvad.MullvadVPN.PacketTunnel.log", isDirectory: false)
     }
 
+    /// The intents log file located in shared container
+    static var intentsLogFileURL: URL? {
+        return Self.containerURL?.appendingPathComponent("Logs/net.mullvad.MullvadVPN.MullvadVPNIntents.log", isDirectory: false)
+    }
+
     /// All log files located in a shared container
     static var logFileURLs: [URL] {
-        return [mainApplicationLogFileURL, packetTunnelLogFileURL].compactMap { $0 }
+        return [mainApplicationLogFileURL, packetTunnelLogFileURL, intentsLogFileURL].compactMap { $0 }
     }
 }

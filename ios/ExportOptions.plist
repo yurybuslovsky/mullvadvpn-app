@@ -18,6 +18,8 @@
       <string>Mullvad VPN Release</string>
       <key>net.mullvad.MullvadVPN.PacketTunnel</key>
       <string>Packet Tunnel Release</string>
+      <key>net.mullvad.MullvadVPN.MullvadVPNIntents</key>
+      <string>Intents Release</string>
     </dict>
 </dict>
 </plist>

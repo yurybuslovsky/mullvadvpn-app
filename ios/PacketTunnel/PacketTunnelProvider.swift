@@ -41,7 +41,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }()
 
     override init() {
-        initLoggingSystem(bundleIdentifier: Bundle.main.bundleIdentifier!)
+        initLoggingSystem(bundleIdentifier: Bundle.main.bundleIdentifier!, rotateLog: true)
 
         logger = Logger(label: "PacketTunnelProvider")
 

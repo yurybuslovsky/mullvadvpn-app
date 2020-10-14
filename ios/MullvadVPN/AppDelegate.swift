@@ -26,7 +26,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Setup logging
-        initLoggingSystem(bundleIdentifier: Bundle.main.bundleIdentifier!)
+        initLoggingSystem(bundleIdentifier: Bundle.main.bundleIdentifier!, rotateLog: false)
 
         #if DEBUG
         let stdoutStream = TextFileOutputStream.standardOutputStream()
