@@ -86,14 +86,9 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
         TunnelManager.shared.addObserver(self)
         self.tunnelState = TunnelManager.shared.tunnelState
 
-        if #available(iOS 13.0, *) {
-            addTileOverlay()
-            loadGeoJSONData()
-            hideMapsAttributions()
-        } else {
-            // Fallback on earlier versions
-            mapView.isHidden = true
-        }
+        addTileOverlay()
+        loadGeoJSONData()
+        hideMapsAttributions()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -144,18 +139,22 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
     // MARK: - MKMapViewDelegate
 
     func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-        if #available(iOS 13, *) {
-            if let polygon = overlay as? MKPolygon {
-                let renderer = MKPolygonRenderer(polygon: polygon)
+        if let polygon = overlay as? MKPolygon {
+            let renderer = MKPolygonRenderer(polygon: polygon)
+            renderer.fillColor = UIColor.primaryColor
+            renderer.strokeColor = UIColor.secondaryColor
+            renderer.lineWidth = 1.0
+            renderer.lineCap = .round
+            renderer.lineJoin = .round
+
+            if #available(iOS 13.0, *) {
                 renderer.shouldRasterize = true
-                renderer.fillColor = UIColor.primaryColor
-                renderer.strokeColor = UIColor.secondaryColor
-                renderer.lineWidth = 1.0
-                renderer.lineCap = .round
-                renderer.lineJoin = .round
-                return renderer
             }
 
+            return renderer
+        }
+
+        if #available(iOS 13, *) {
             if let multiPolygon = overlay as? MKMultiPolygon {
                 let renderer = MKMultiPolygonRenderer(multiPolygon: multiPolygon)
                 renderer.shouldRasterize = true
@@ -166,15 +165,13 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
                 renderer.lineJoin = .round
                 return renderer
             }
-
-            if let tileOverlay = overlay as? MKTileOverlay {
-                return CustomOverlayRenderer(overlay: tileOverlay)
-            }
-
-            fatalError()
-        } else {
-            return MKOverlayRenderer(overlay: overlay)
         }
+
+        if let tileOverlay = overlay as? MKTileOverlay {
+            return CustomOverlayRenderer(overlay: tileOverlay)
+        }
+
+        fatalError()
     }
 
     private func addTileOverlay() {
@@ -188,22 +185,12 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
         mapView.addOverlay(tileOverlay)
     }
 
-    @available(iOS 13.0, *)
     private func loadGeoJSONData() {
-        let decoder = MKGeoJSONDecoder()
+        let fileURL = Bundle.main.url(forResource: "countries.geo", withExtension: "json")!
+        let data = try! Data(contentsOf: fileURL)
 
-        let geoJSONURL = Bundle.main.url(forResource: "countries.geo", withExtension: "json")!
-
-        let data = try! Data(contentsOf: geoJSONURL)
-        let geoJSONObjects = try! decoder.decode(data)
-
-        for object in geoJSONObjects {
-            if let feat = object as? MKGeoJSONFeature {
-                for case let overlay as MKOverlay in feat.geometry {
-                    mapView.addOverlay(overlay, level: .aboveLabels)
-                }
-            }
-        }
+        let overlays = try! GeoJSON.decodeGeoJSON(data)
+        mapView.addOverlays(overlays, level: .aboveLabels)
     }
 
     private func hideMapsAttributions() {
