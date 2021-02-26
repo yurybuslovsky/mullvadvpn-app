@@ -31,6 +31,9 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
 
     private let logger = Logger(label: "ConnectViewController")
 
+    private var lastLocation: CLLocationCoordinate2D?
+    private let locationMarker = MKPointAnnotation()
+
     private let connectButton = AppButton(style: .success)
     private let selectLocationButton = AppButton(style: .translucentNeutral)
     private let splitDisconnectButtonView = DisconnectSplitButton()
@@ -61,6 +64,7 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
             updateSecureLabel()
             updateTunnelConnectionInfo()
             updateButtons()
+            updateLocation(animated: true)
         }
     }
 
@@ -86,9 +90,12 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
         TunnelManager.shared.addObserver(self)
         self.tunnelState = TunnelManager.shared.tunnelState
 
+        mapView.register(MKAnnotationView.self, forAnnotationViewWithReuseIdentifier: "location")
+
         addTileOverlay()
         loadGeoJSONData()
         hideMapsAttributions()
+        updateLocation(animated: false)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -147,17 +154,12 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
             renderer.lineCap = .round
             renderer.lineJoin = .round
 
-            if #available(iOS 13.0, *) {
-                renderer.shouldRasterize = true
-            }
-
             return renderer
         }
 
         if #available(iOS 13, *) {
             if let multiPolygon = overlay as? MKMultiPolygon {
                 let renderer = MKMultiPolygonRenderer(multiPolygon: multiPolygon)
-                renderer.shouldRasterize = true
                 renderer.fillColor = UIColor.primaryColor
                 renderer.strokeColor = UIColor.secondaryColor
                 renderer.lineWidth = 1.0
@@ -172,6 +174,23 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
         }
 
         fatalError()
+    }
+
+    func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+        if annotation === locationMarker {
+            let view = mapView.dequeueReusableAnnotationView(withIdentifier: "location", for: annotation)
+            view.isDraggable = false
+            view.canShowCallout = false
+            view.image = self.locationMarkerSecureImage
+            return view
+        }
+        return nil
+    }
+
+    // MARK: - Private
+
+    private var locationMarkerSecureImage: UIImage {
+        return UIImage(named: "LocationMarkerSecure")!
     }
 
     private func addTileOverlay() {
@@ -200,8 +219,6 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
             }
         }
     }
-
-    // MARK: - Private
 
     private func updateButtons() {
         switch tunnelState {
@@ -346,6 +363,74 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
         }
     }
 
+    private func locationMarkerOffset() -> CGPoint {
+        // The spacing between the secure label and the marker
+        let markerSecureLabelSpacing = CGFloat(22)
+
+        // Compute the secure label's frame within the view coordinate system
+        let secureLabelFrame = secureLabel.convert(secureLabel.bounds, to: view)
+
+        // The marker's center coincides with the geo coordinate
+        let markerAnchorOffsetInPoints = locationMarkerSecureImage.size.height * 0.5
+
+        // Compute the distance from the top of the label's frame to the center of the map
+        let secureLabelDistanceToMapCenterY = secureLabelFrame.minY - mapView.frame.midY
+
+        // Compute the marker offset needed to position it above the secure label
+        let offsetY = secureLabelDistanceToMapCenterY - markerAnchorOffsetInPoints - markerSecureLabelSpacing
+
+        return CGPoint(x: 0, y: offsetY)
+    }
+
+    private func computeCoordinateRegion(centerCoordinate: CLLocationCoordinate2D, centerOffsetInPoints: CGPoint) -> MKCoordinateRegion  {
+        let span = MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 30)
+        var region = MKCoordinateRegion(center: centerCoordinate, span: span)
+        region = mapView.regionThatFits(region)
+
+        let latitudeDeltaPerPoint = region.span.latitudeDelta / Double(mapView.frame.height)
+        var offsetCenter = centerCoordinate
+        offsetCenter.latitude += CLLocationDegrees(latitudeDeltaPerPoint * Double(centerOffsetInPoints.y))
+        region.center = offsetCenter
+
+        return region
+    }
+
+    private func updateLocation(animated: Bool) {
+        switch tunnelState {
+        case .connected(let connectionInfo),
+             .reconnecting(let connectionInfo):
+            let coordinate = connectionInfo.location.geoCoordinate
+            if let lastLocation = self.lastLocation, coordinate.approximatelyEqualTo(lastLocation) {
+                return
+            }
+
+            let markerOffset = locationMarkerOffset()
+            let region = computeCoordinateRegion(centerCoordinate: coordinate, centerOffsetInPoints: markerOffset)
+
+            locationMarker.coordinate = coordinate
+            mapView.addAnnotation(locationMarker)
+            mapView.setRegion(region, animated: animated)
+
+            self.lastLocation = coordinate
+
+        case .disconnected, .disconnecting:
+            let coordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+            if let lastLocation = self.lastLocation, coordinate.approximatelyEqualTo(lastLocation) {
+                return
+            }
+
+            let span = MKCoordinateSpan(latitudeDelta: 90, longitudeDelta: 90)
+            let region = MKCoordinateRegion(center: coordinate, span: span)
+            mapView.removeAnnotation(locationMarker)
+            mapView.setRegion(region, animated: animated)
+
+            self.lastLocation = coordinate
+
+        case .connecting:
+            break
+        }
+    }
+
     // MARK: - Actions
 
     @objc func handleConnectionPanelButton(_ sender: Any) {
@@ -398,4 +483,27 @@ private extension TunnelState {
         }
     }
 
+}
+
+extension CLLocationCoordinate2D {
+    func approximatelyEqualTo(_ other: CLLocationCoordinate2D) -> Bool {
+        return fabs(self.latitude - other.latitude) <= .ulpOfOne &&
+            fabs(self.longitude - other.longitude) <= .ulpOfOne
+    }
+}
+
+extension MKCoordinateRegion {
+    var mapRect: MKMapRect {
+        let topLeft = CLLocationCoordinate2D(latitude: self.center.latitude + (self.span.latitudeDelta/2), longitude: self.center.longitude - (self.span.longitudeDelta/2))
+        let bottomRight = CLLocationCoordinate2D(latitude: self.center.latitude - (self.span.latitudeDelta/2), longitude: self.center.longitude + (self.span.longitudeDelta/2))
+
+        let a = MKMapPoint(topLeft)
+        let b = MKMapPoint(bottomRight)
+
+        return MKMapRect(x: min(a.x, b.x),
+                         y: min(a.y, b.y),
+                         width: abs(a.x - b.x),
+                         height: abs(a.y - b.y)
+        )
+    }
 }

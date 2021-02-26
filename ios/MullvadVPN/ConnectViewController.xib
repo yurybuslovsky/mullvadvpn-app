@@ -25,7 +25,7 @@
             <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
             <subviews>
-                <mapView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" mapType="standard" rotateEnabled="NO" pitchEnabled="NO" showsBuildings="NO" showsCompass="NO" showsPointsOfInterest="NO" translatesAutoresizingMaskIntoConstraints="NO" id="wjr-J0-oEH">
+                <mapView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" mapType="standard" zoomEnabled="NO" scrollEnabled="NO" rotateEnabled="NO" pitchEnabled="NO" showsBuildings="NO" showsCompass="NO" showsPointsOfInterest="NO" translatesAutoresizingMaskIntoConstraints="NO" id="wjr-J0-oEH">
                     <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                     <connections>
                         <outlet property="delegate" destination="-1" id="Tc4-e5-yOc"/>
@@ -110,7 +110,7 @@
                 <constraint firstAttribute="trailingMargin" secondItem="SON-pD-ZGn" secondAttribute="trailing" id="Vhs-Sr-QUI"/>
                 <constraint firstItem="82Y-rR-Igf" firstAttribute="top" secondItem="SON-pD-ZGn" secondAttribute="bottom" constant="24" id="WhU-py-uqj"/>
                 <constraint firstAttribute="bottom" secondItem="wjr-J0-oEH" secondAttribute="bottom" id="bPk-xf-Vq6"/>
-                <constraint firstItem="wjr-J0-oEH" firstAttribute="top" secondItem="bFH-8p-vRl" secondAttribute="top" id="i9X-Ad-e7C"/>
+                <constraint firstAttribute="top" secondItem="wjr-J0-oEH" secondAttribute="top" id="gnD-E8-COW"/>
             </constraints>
             <edgeInsets key="layoutMargins" top="0.0" left="24" bottom="24" right="24"/>
             <point key="canvasLocation" x="139" y="153"/>
