@@ -356,8 +356,10 @@ class RootContainerViewController: UIViewController {
 
     /// Updates additional safe area insets to push the child views below the header bar
     private func updateAdditionalSafeAreaInsetsIfNeeded() {
+        let offsetTop = view.safeAreaInsets.top - additionalSafeAreaInsets.top
+
         // Reset top inset if header bar is invisible
-        let insetTop = headerBarHidden ? 0 : headerBarView.frame.height
+        let insetTop = headerBarHidden ? 0 : headerBarView.frame.height - offsetTop
 
         if additionalSafeAreaInsets.top != insetTop {
             additionalSafeAreaInsets.top = insetTop
