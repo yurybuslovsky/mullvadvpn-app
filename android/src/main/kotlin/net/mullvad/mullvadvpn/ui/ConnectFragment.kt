@@ -1,7 +1,9 @@
 package net.mullvad.mullvadvpn.ui
 
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,6 +11,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import net.mullvad.mullvadvpn.R
 import net.mullvad.mullvadvpn.model.TunnelState
+import net.mullvad.mullvadvpn.ui.activities.TVActivity
 import net.mullvad.mullvadvpn.ui.notification.AccountExpiryNotification
 import net.mullvad.mullvadvpn.ui.notification.KeyStatusNotification
 import net.mullvad.mullvadvpn.ui.notification.TunnelStateNotification
@@ -22,11 +25,12 @@ import org.osmdroid.bonuspack.kml.Style
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.FolderOverlay
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
 import java.io.IOException
 import java.io.InputStream
 import java.nio.charset.Charset
+import kotlin.system.measureTimeMillis
 
 val KEY_IS_TUNNEL_INFO_EXPANDED = "is_tunnel_info_expanded"
 
@@ -197,6 +201,7 @@ class ConnectFragment :
     }
 
     lateinit var mapView: MapView
+
     @Suppress("DEPRECATION")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -208,16 +213,44 @@ class ConnectFragment :
         mapController.setCenter(startPoint)
         mapView.overlays.add(ColorOverlay(ContextCompat.getColor(requireContext(), R.color.darkBlue)))
         addAdditionalLayer()
-
         val startMarker = Marker(mapView)
         startMarker.position = startPoint
         startMarker.icon = ContextCompat.getDrawable(requireContext(), R.drawable.marker)
-        startMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        startMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
         mapView.overlays.add(startMarker)
+
+        if (requireActivity() !is TVActivity) {
+            view.postDelayed(
+                {
+                    mapView.setMapCenterOffset(0, getOffset())
+                    mapView.invalidate()
+                },
+                30
+            )
+        }
     }
 
-    private fun addAdditionalLayer() {
-        val jsonString = try {
+    private fun getOffset(): Int {
+        view?.findViewById<View>(R.id.connection_status)?.let {
+            val rect = Rect()
+            mapView.getGlobalVisibleRect(rect)
+            val mapCenter = rect.centerY()
+            it.getGlobalVisibleRect(rect)
+            val textViewTop = rect.top
+            val diff = rect.top - mapCenter
+            Log.e("getOffset", "textViewTop=$textViewTop, mapCenter=$mapCenter, diff=$diff")
+            val margin = resources.getDimensionPixelOffset(R.dimen.screen_vertical_margin)
+            val markerHalfSize = resources.getDimensionPixelSize(R.dimen.marker_size) / 2
+            Log.e("getOffset", "margin=$margin, markerHalfSize=$markerHalfSize")
+            val offset = diff - margin - markerHalfSize
+            Log.e("getOffset", "offset=$offset")
+            return offset
+        }
+        return 0
+    }
+
+    private fun readJSON(): String? {
+        return try {
             val jsonStream: InputStream = requireContext().assets.open("geometry.json")
             val size = jsonStream.available()
             val buffer = ByteArray(size)
@@ -226,20 +259,25 @@ class ConnectFragment :
             String(buffer, Charset.forName("UTF-8"))
         } catch (ex: IOException) {
             ex.printStackTrace()
-            return
+            return null
         }
+    }
+
+    private fun addAdditionalLayer() {
+        val jsonString = readJSON()
         val kmlDocument = KmlDocument()
         kmlDocument.parseGeoJSON(jsonString)
+        mapView.overlays.add(createOverlay(kmlDocument))
+    }
+
+    private fun createOverlay(kmlDocument: KmlDocument): Overlay {
         val defaultStyle = Style(
             null,
             ContextCompat.getColor(requireContext(), R.color.darkBlue),
             3.0f,
             ContextCompat.getColor(requireContext(), R.color.blue)
         )
-
-        val myOverLay = kmlDocument.mKmlRoot.buildOverlay(mapView, defaultStyle, null, kmlDocument) as FolderOverlay
-        mapView.getOverlays().add(myOverLay)
-        mapView.invalidate()
+        return kmlDocument.mKmlRoot.buildOverlay(mapView, defaultStyle, null, kmlDocument)
     }
 
     inner class ColorOverlay(private val color: Int) : org.osmdroid.views.overlay.Overlay() {

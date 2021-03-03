@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="60dp"
-          android:height="60dp"
+    <item android:width="@dimen/marker_size"
+          android:height="@dimen/marker_size"
           android:gravity="center">
         <shape android:innerRadius="20dp"
                android:shape="oval">
