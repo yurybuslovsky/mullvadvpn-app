@@ -90,11 +90,7 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
         TunnelManager.shared.addObserver(self)
         self.tunnelState = TunnelManager.shared.tunnelState
 
-        mapView.register(MKAnnotationView.self, forAnnotationViewWithReuseIdentifier: "location")
-
-        addTileOverlay()
-        loadGeoJSONData()
-        hideMapsAttributions()
+        setupMapView()
         updateLocation(animated: false)
     }
 
@@ -191,6 +187,14 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
 
     private var locationMarkerSecureImage: UIImage {
         return UIImage(named: "LocationMarkerSecure")!
+    }
+
+    private func setupMapView() {
+        mapView.register(MKAnnotationView.self, forAnnotationViewWithReuseIdentifier: "location")
+
+        addTileOverlay()
+        loadGeoJSONData()
+        hideMapsAttributions()
     }
 
     private func addTileOverlay() {
