@@ -197,6 +197,11 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
     private func setupMapView() {
         mapView.register(MKAnnotationView.self, forAnnotationViewWithReuseIdentifier: "location")
 
+        if #available(iOS 13.0, *) {
+            // Use dark style for the map to dim the map grid
+            mapView.overrideUserInterfaceStyle = .dark
+        }
+
         addTileOverlay()
         loadGeoJSONData()
         hideMapsAttributions()
