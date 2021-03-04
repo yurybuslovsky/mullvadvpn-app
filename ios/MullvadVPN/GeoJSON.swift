@@ -152,6 +152,20 @@ extension GeoJSON {
                 return MKPolygon(coordinates: interiorCoords, count: interiorCoords.count)
             }
 
+            if exteriorCoordinates.count > 2 {
+                let n = exteriorCoordinates.count - 1
+
+                for i in 1 ..< n {
+                    for j in 0 ..< i-1 {
+                        if let intersection = intersectionBetweenSegmentsCL(exteriorCoordinates[i], exteriorCoordinates[i+1], exteriorCoordinates[j], exteriorCoordinates[j+1]) {
+                            // do whatever you want with `intersection`
+
+                            print("Error: Intersection @ \(intersection)")
+                        }
+                    }
+                }
+            }
+
             return MKPolygon(
                 coordinates: exteriorCoordinates,
                 count: exteriorCoordinates.count,
@@ -199,4 +213,20 @@ extension GeoJSON {
             return featureCollection.mkOverlays
         }
     }
+}
+
+private func intersectionBetweenSegmentsCL(_ p0: CLLocationCoordinate2D, _ p1: CLLocationCoordinate2D, _ p2: CLLocationCoordinate2D, _ p3: CLLocationCoordinate2D) -> CLLocationCoordinate2D? {
+    var denominator = (p3.longitude - p2.longitude) * (p1.latitude - p0.latitude) - (p3.latitude - p2.latitude) * (p1.longitude - p0.longitude)
+    var ua = (p3.latitude - p2.latitude) * (p0.longitude - p2.longitude) - (p3.longitude - p2.longitude) * (p0.latitude - p2.latitude)
+    var ub = (p1.latitude - p0.latitude) * (p0.longitude - p2.longitude) - (p1.longitude - p0.longitude) * (p0.latitude - p2.latitude)
+
+    if (denominator < 0) {
+        ua = -ua; ub = -ub; denominator = -denominator
+    }
+
+    if ua >= 0.0 && ua <= denominator && ub >= 0.0 && ub <= denominator && denominator != 0 {
+        print("INTERSECT")
+        return CLLocationCoordinate2D(latitude: p0.latitude + ua / denominator * (p1.latitude - p0.latitude), longitude: p0.longitude + ua / denominator * (p1.longitude - p0.longitude))
+    }
+    return nil
 }
