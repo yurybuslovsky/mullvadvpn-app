@@ -29,7 +29,10 @@ extension GeoJSON {
 
         var mkOverlays: [MKOverlay] {
             return features.flatMap { (feature) -> [MKOverlay] in
-                switch feature.geometry {
+                // Some tools like mapshaper output empty features after optimizing out the geometry
+                guard let geometry = feature.geometry else { return [] }
+
+                switch geometry {
                 case .polygon(let polygon):
                     return [polygon.mkPolygon]
 
@@ -92,7 +95,7 @@ extension GeoJSON {
 
     struct Feature: Decodable {
         let identifier: String?
-        let geometry: Geometry
+        let geometry: Geometry?
         let properties: [String: Any?]?
 
         private enum CodingKeys: String, CodingKey {
@@ -107,7 +110,7 @@ extension GeoJSON {
             properties = try container.decodeIfPresent(AnyDecodableValue.self, forKey: .properties)?.anyValue as? [String: Any?]
 
             if type == "Feature" {
-                geometry = try container.decode(Geometry.self, forKey: .geometry)
+                geometry = try container.decodeIfPresent(Geometry.self, forKey: .geometry)
             } else {
                 throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Feature: Invalid type \(type)")
             }
