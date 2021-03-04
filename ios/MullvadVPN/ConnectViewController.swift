@@ -64,7 +64,12 @@ class ConnectViewController: UIViewController, RootContainment, TunnelObserver,
             updateSecureLabel()
             updateTunnelConnectionInfo()
             updateButtons()
-            updateLocation(animated: true)
+
+            // Avoid unnecessary animations, particularly when this property is changed from inside
+            // the `viewDidLoad`.
+            let isViewVisible = self.viewIfLoaded?.window != nil
+
+            updateLocation(animated: isViewVisible)
         }
     }
 
