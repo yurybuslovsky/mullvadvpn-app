@@ -2,6 +2,7 @@ package net.mullvad.mullvadvpn.ui.fragments
 
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
@@ -10,7 +11,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.consumeAsFlow
@@ -22,9 +25,12 @@ import net.mullvad.mullvadvpn.applist.ViewIntent
 import net.mullvad.mullvadvpn.di.APPS_SCOPE
 import net.mullvad.mullvadvpn.di.SERVICE_CONNECTION_SCOPE
 import net.mullvad.mullvadvpn.model.ListItemData
+import net.mullvad.mullvadvpn.model.ListItemData.Companion.APPLICATION
+import net.mullvad.mullvadvpn.model.ListItemData.Companion.SEARCH_VIEW
 import net.mullvad.mullvadvpn.ui.ListItemDividerDecoration
 import net.mullvad.mullvadvpn.ui.ListItemListener
 import net.mullvad.mullvadvpn.ui.ListItemsAdapter
+import net.mullvad.mullvadvpn.util.safeOffer
 import net.mullvad.mullvadvpn.util.setMargins
 import net.mullvad.mullvadvpn.viewmodel.SplitTunnelingViewModel
 import org.koin.android.ext.android.getKoin
@@ -47,9 +53,22 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
         }
     )
     private val toggleExcludeChannel = Channel<ListItemData>(Channel.BUFFERED)
+    private var searchActivateCallback: (() -> Unit)? = null
+    private val searchActivate = callbackFlow<Unit> {
+        searchActivateCallback = {
+            Log.e("TEST", "SearchClicked")
+            safeOffer(Unit)
+        }
+        awaitClose {
+            searchActivateCallback = null
+        }
+    }
     private val listItemListener = object : ListItemListener {
         override fun onItemAction(item: ListItemData) {
-            toggleExcludeChannel.offer(item)
+            when (item.type) {
+                APPLICATION -> toggleExcludeChannel.offer(item)
+                SEARCH_VIEW -> searchActivateCallback?.invoke()
+            }
         }
     }
 
@@ -100,6 +119,7 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
 
     private fun intents(): Flow<ViewIntent> = merge(
         transitionFinishedFlow.map { ViewIntent.ViewIsReady },
+        searchActivate.map { ViewIntent.SearchApplication("") },
         toggleExcludeChannel.consumeAsFlow().map { ViewIntent.ChangeApplicationGroup(it) }
     )
 

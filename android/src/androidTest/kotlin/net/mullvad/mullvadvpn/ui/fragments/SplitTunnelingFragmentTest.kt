@@ -105,7 +105,7 @@ class SplitTunnelingFragmentTest : KoinTest {
             )
         )
 
-        onView(withRecyclerView(R.id.recyclerView).atPositionOnView(0, R.id.plain_text))
+        onView(withRecyclerView(R.id.recyclerView).atPositionOnView(0, R.id.itemText))
             .check(matches(withText("Test Item")))
 
         verifyAll {

@@ -17,17 +17,21 @@ class TwoActionListItemView(context: Context) :
     }
 
     override fun updateAction() {
-        if (itemData.action == null) {
-            container.setOnClickListener(null)
-            container.isClickable = false
-            container.isFocusable = false
-        } else {
-            container.setOnClickListener(clickListener)
-            container.isClickable = true
-            container.isFocusable = true
+        container.run {
+            if (itemData.action == null) {
+                setOnClickListener(null)
+                isClickable = false
+                isFocusable = false
+            } else {
+                setOnClickListener(clickListener)
+                isClickable = true
+                isFocusable = true
+            }
         }
-        widgetContainer.setOnClickListener(clickListener)
-        widgetContainer.isClickable = true
-        widgetContainer.isFocusable = true
+        widgetContainer?.run {
+            setOnClickListener(clickListener)
+            isClickable = true
+            isFocusable = true
+        }
     }
 }

@@ -41,7 +41,7 @@ class ApplicationListItemView @JvmOverloads constructor(
     }
 
     override fun updateImage() {
-        itemIcon.isVisible = true
+        itemIcon?.isVisible = true
         updateImageJob?.cancel()
         updateImageJob = viewScope.launch {
             loadImage()?.let { drawable ->
@@ -75,5 +75,5 @@ class ApplicationListItemView @JvmOverloads constructor(
         }
     }
 
-    private fun updateImage(drawable: Drawable) = itemIcon.setImageDrawable(drawable)
+    private fun updateImage(drawable: Drawable) = itemIcon?.setImageDrawable(drawable)
 }

@@ -14,6 +14,7 @@ import net.mullvad.mullvadvpn.ui.listitemview.DividerGroupListItemView
 import net.mullvad.mullvadvpn.ui.listitemview.ListItemView
 import net.mullvad.mullvadvpn.ui.listitemview.PlainListItemView
 import net.mullvad.mullvadvpn.ui.listitemview.ProgressListItemView
+import net.mullvad.mullvadvpn.ui.listitemview.SearchListItemView
 import net.mullvad.mullvadvpn.ui.listitemview.TwoActionListItemView
 
 class ListItemsAdapter : RecyclerView.Adapter<ListItemsAdapter.ViewHolder>() {
@@ -36,6 +37,7 @@ class ListItemsAdapter : RecyclerView.Adapter<ListItemsAdapter.ViewHolder>() {
                     ListItemData.ACTION -> ActionListItemView(parent.context)
                     ListItemData.APPLICATION -> ApplicationListItemView(parent.context)
                     ListItemData.DOUBLE_ACTION -> TwoActionListItemView(parent.context)
+                    ListItemData.SEARCH_VIEW -> SearchListItemView(parent.context)
                     else ->
                         throw IllegalArgumentException("View type '$viewType' is not supported")
                 }

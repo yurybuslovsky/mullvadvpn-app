@@ -57,6 +57,8 @@ class SplitTunnelingViewModelTest {
         val initialExpectedList = listOf(
             createTextItem(R.string.split_tunneling_description),
             createDivider(0),
+            createSearchItem(R.string.search_hint),
+            createDivider(1),
             createProgressItem()
         )
 
@@ -72,7 +74,11 @@ class SplitTunnelingViewModelTest {
         initTestSubject(emptyList())
         testSubject.processIntent(ViewIntent.ViewIsReady)
         val actualList = testSubject.listItems.first()
-        val expectedList = listOf(createTextItem(R.string.split_tunneling_description))
+        val expectedList = listOf(
+            createTextItem(R.string.split_tunneling_description),
+            createDivider(0),
+            createSearchItem(R.string.search_hint)
+        )
         assertLists(expectedList, actualList)
     }
 
@@ -90,9 +96,11 @@ class SplitTunnelingViewModelTest {
         val expectedList = listOf(
             createTextItem(R.string.split_tunneling_description),
             createDivider(0),
+            createSearchItem(R.string.search_hint),
+            createDivider(1),
             createMainItem(R.string.exclude_applications),
             createApplicationItem(appExcluded, true),
-            createDivider(1),
+            createDivider(2),
             createMainItem(R.string.all_applications),
             createApplicationItem(appNotExcluded, false),
         )
@@ -118,6 +126,8 @@ class SplitTunnelingViewModelTest {
         val expectedListBeforeAction = listOf(
             createTextItem(R.string.split_tunneling_description),
             createDivider(0),
+            createSearchItem(R.string.search_hint),
+            createDivider(1),
             createMainItem(R.string.exclude_applications),
             createApplicationItem(app, true),
         )
@@ -130,7 +140,9 @@ class SplitTunnelingViewModelTest {
         val itemsAfterAction = testSubject.listItems.first()
         val expectedList = listOf(
             createTextItem(R.string.split_tunneling_description),
-            createDivider(1),
+            createDivider(0),
+            createSearchItem(R.string.search_hint),
+            createDivider(2),
             createMainItem(R.string.all_applications),
             createApplicationItem(app, false),
         )
@@ -155,7 +167,9 @@ class SplitTunnelingViewModelTest {
         val listBeforeAction = testSubject.listItems.first()
         val expectedListBeforeAction = listOf(
             createTextItem(R.string.split_tunneling_description),
-            createDivider(1),
+            createDivider(0),
+            createSearchItem(R.string.search_hint),
+            createDivider(2),
             createMainItem(R.string.all_applications),
             createApplicationItem(app, false),
         )
@@ -169,6 +183,8 @@ class SplitTunnelingViewModelTest {
         val expectedList = listOf(
             createTextItem(R.string.split_tunneling_description),
             createDivider(0),
+            createSearchItem(R.string.search_hint),
+            createDivider(1),
             createMainItem(R.string.exclude_applications),
             createApplicationItem(app, true),
         )
@@ -217,6 +233,13 @@ class SplitTunnelingViewModelTest {
     private fun createTextItem(@StringRes text: Int): ListItemData =
         ListItemData.build("text_$text") {
             type = ListItemData.PLAIN
+            textRes = text
+            action = ListItemData.ItemAction(text.toString())
+        }
+
+    private fun createSearchItem(@StringRes text: Int): ListItemData =
+        ListItemData.build("search_$text") {
+            type = ListItemData.SEARCH_VIEW
             textRes = text
             action = ListItemData.ItemAction(text.toString())
         }
