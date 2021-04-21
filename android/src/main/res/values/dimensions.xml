@@ -43,6 +43,8 @@
     <dimen name="screen_vertical_margin">22dp</dimen>
     <dimen name="app_list_item_icon_size">35dp</dimen>
     <dimen name="progress_size">60dp</dimen>
+    <dimen name="search_view_height">42dp</dimen>
+    <dimen name="search_view_icon_padding">9dp</dimen>
     <dimen name="icon_size">24dp</dimen>
     <dimen name="widget_padding">16dp</dimen>
     <dimen name="expanded_toolbar_height">104dp</dimen>

@@ -1,5 +1,6 @@
 package net.mullvad.mullvadvpn.viewmodel
 
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,14 +36,15 @@ class SplitTunnelingViewModel(
     private val notExcludedApps: MutableMap<String, AppData> = mutableMapOf()
 
     private val defaultListItems: List<ListItemData> = listOf(
-        createTextItem(R.string.split_tunneling_description)
-        // We will have search item in future
+        createTextItem(R.string.split_tunneling_description),
+        createDivider(0),
+        createSearchItem(R.string.search_hint)
     )
     private var isSystemAppsVisible = false
 
     init {
         viewModelScope.launch(dispatcher) {
-            listItemsSink.emit(defaultListItems + createDivider(0) + createProgressItem())
+            listItemsSink.emit(defaultListItems + createDivider(1) + createProgressItem())
             // this will be removed after changes on native to ignore enable parameter
             if (!splitTunneling.enabled)
                 splitTunneling.enabled = true
@@ -78,6 +80,10 @@ class SplitTunnelingViewModel(
                 isSystemAppsVisible = viewIntent.show
                 publishList()
             }
+            /*is ViewIntent.SearchApplication -> {
+
+            }*/
+            else -> Log.e("mullvad", "Unhandled ViewIntent: $viewIntent")
         }
     }
 
@@ -111,17 +117,22 @@ class SplitTunnelingViewModel(
     private suspend fun publishList() {
         val listItems = ArrayList(defaultListItems)
         if (excludedApps.isNotEmpty()) {
-            listItems += createDivider(0)
+            listItems += createDivider(1)
             listItems += createMainItem(R.string.exclude_applications)
             listItems += excludedApps.values.sortedBy { it.name }.map { info ->
                 createApplicationItem(info, true)
             }
         }
+//<<<<<<< HEAD
         val shownNotExcludedApps =
             notExcludedApps.filter { app -> !app.value.isSystemApp || isSystemAppsVisible }
         if (shownNotExcludedApps.isNotEmpty()) {
             listItems += createDivider(1)
             listItems += createSwitchItem(R.string.show_system_apps, isSystemAppsVisible)
+//=======
+//        if (notExcludedApps.isNotEmpty()) {
+//            listItems += createDivider(2)
+//>>>>>>> 11fa3acb7 (Init filter view)
             listItems += createMainItem(R.string.all_applications)
             listItems += shownNotExcludedApps.values.sortedBy { it.name }.map { info ->
                 createApplicationItem(info, false)
@@ -154,6 +165,13 @@ class SplitTunnelingViewModel(
     private fun createTextItem(@StringRes text: Int): ListItemData =
         ListItemData.build("text_$text") {
             type = ListItemData.PLAIN
+            textRes = text
+            action = ListItemData.ItemAction(text.toString())
+        }
+
+    private fun createSearchItem(@StringRes text: Int): ListItemData =
+        ListItemData.build("search_$text") {
+            type = ListItemData.SEARCH_VIEW
             textRes = text
             action = ListItemData.ItemAction(text.toString())
         }

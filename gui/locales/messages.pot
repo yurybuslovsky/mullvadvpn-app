@@ -1364,6 +1364,9 @@ msgstr ""
 msgid "No relay server matches the current settings"
 msgstr ""
 
+msgid "Search…"
+msgstr ""
+
 msgid "Secured"
 msgstr ""
 

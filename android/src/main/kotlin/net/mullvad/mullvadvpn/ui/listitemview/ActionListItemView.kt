@@ -9,6 +9,8 @@ import android.widget.TextView
 import androidx.core.view.isVisible
 import net.mullvad.mullvadvpn.R
 import net.mullvad.mullvadvpn.model.WidgetState
+import net.mullvad.mullvadvpn.ui.listitemview.WidgetViewController.StandardController
+import net.mullvad.mullvadvpn.ui.listitemview.WidgetViewController.SwitchController
 
 open class ActionListItemView @JvmOverloads constructor(
     context: Context,
@@ -19,8 +21,8 @@ open class ActionListItemView @JvmOverloads constructor(
 
     protected var widgetController: WidgetViewController<*>? = null
     protected val itemText: TextView = findViewById(R.id.itemText)
-    protected val itemIcon: ImageView = findViewById(R.id.itemIcon)
-    protected val widgetContainer: ViewGroup = findViewById(R.id.widgetContainer)
+    protected val itemIcon: ImageView? = findViewById(R.id.itemIcon)
+    protected val widgetContainer: ViewGroup? = findViewById(R.id.widgetContainer)
 
     protected val clickListener = OnClickListener {
         itemData.action?.let { _ ->
@@ -42,20 +44,22 @@ open class ActionListItemView @JvmOverloads constructor(
     }
 
     protected open fun updateImage() {
-        try {
-            itemData.iconRes?.let {
-                itemIcon.isVisible = true
-                itemIcon.setImageResource(it)
+        itemIcon?.run {
+            try {
+                itemData.iconRes?.let {
+                    isVisible = true
+                    setImageResource(it)
+                    return
+                }
+            } catch (ignore: Resources.NotFoundException) {
+                isVisible = true
+                setImageResource(R.drawable.ic_icons_missing)
                 return
             }
-        } catch (ignore: Resources.NotFoundException) {
-            itemIcon.isVisible = true
-            itemIcon.setImageResource(R.drawable.ic_icons_missing)
-            return
-        }
 
-        itemIcon.isVisible = false
-        itemIcon.setImageDrawable(null)
+            isVisible = false
+            setImageDrawable(null)
+        }
     }
 
     protected open fun updateText() {
@@ -83,29 +87,31 @@ open class ActionListItemView @JvmOverloads constructor(
     }
 
     protected open fun updateWidget() {
-        itemData.widget.let { state ->
-            when (state) {
-                is WidgetState.ImageState -> {
-                    if (widgetController !is WidgetViewController.StandardController) {
-                        widgetContainer.removeAllViews()
-                        widgetContainer.isVisible = true
-                        widgetController = WidgetViewController.StandardController(widgetContainer)
+        widgetContainer?.run {
+            itemData.widget.let { state ->
+                when (state) {
+                    is WidgetState.ImageState -> {
+                        if (widgetController !is StandardController) {
+                            removeAllViews()
+                            isVisible = true
+                            widgetController = StandardController(widgetContainer)
+                        }
+                        (widgetController as StandardController).updateState(state)
                     }
-                    (widgetController as WidgetViewController.StandardController).updateState(state)
-                }
-                is WidgetState.SwitchState -> {
-                    if (widgetController !is WidgetViewController.SwitchController) {
-                        widgetContainer.removeAllViews()
-                        widgetContainer.isVisible = true
-                        widgetController = WidgetViewController.SwitchController(widgetContainer)
+                    is WidgetState.SwitchState -> {
+                        if (widgetController !is SwitchController) {
+                            removeAllViews()
+                            isVisible = true
+                            widgetController = SwitchController(widgetContainer)
+                        }
+                        (widgetController as SwitchController).updateState(state)
                     }
-                    (widgetController as WidgetViewController.SwitchController).updateState(state)
-                }
-                null -> {
-                    if (widgetController != null) {
-                        widgetController = null
-                        widgetContainer.removeAllViews()
-                        widgetContainer.isVisible = false
+                    null -> {
+                        if (widgetController != null) {
+                            widgetController = null
+                            removeAllViews()
+                            isVisible = false
+                        }
                     }
                 }
             }
@@ -114,6 +120,6 @@ open class ActionListItemView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        widgetContainer.requestLayout()
+        widgetContainer?.requestLayout()
     }
 }

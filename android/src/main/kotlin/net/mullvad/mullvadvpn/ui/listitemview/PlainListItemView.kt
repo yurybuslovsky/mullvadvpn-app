@@ -10,7 +10,7 @@ class PlainListItemView(context: Context) :
     override val layoutRes: Int
         get() = R.layout.list_item_plain_text
     override val heightRes: Int? = null
-    private val plainText: TextView = findViewById(R.id.plain_text)
+    private val plainText: TextView = findViewById(R.id.itemText)
 
     override fun onUpdate() {
         updateText()
