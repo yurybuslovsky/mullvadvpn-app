@@ -5,7 +5,7 @@ import net.mullvad.mullvadvpn.model.ListItemData
 sealed class ViewIntent {
     // In future we will have search intent
     data class ChangeApplicationGroup(val item: ListItemData) : ViewIntent()
-    data class SearchApplication(val term: String) : ViewIntent()
+    data class SearchApplication(val term: String?) : ViewIntent()
     object ViewIsReady : ViewIntent()
     data class ShowSystemApps(internal val show: Boolean) : ViewIntent()
 }

@@ -108,6 +108,17 @@
         <item name="android:layout_height">@dimen/search_view_height</item>
         <item name="android:textViewStyle">@style/SearchViewText</item>
     </style>
+    <style name="ListItem.SearchInputView">
+        <!--<item name="android:clickable">false</item>
+        <item name="android:focusable">false</item>-->
+        <!--<item name="android:background">@color/white</item> //should be only for main item and not for sub-items-->
+        <!--<item name="android:focusableInTouchMode">false</item>-->
+        <item name="android:textColorHint">@color/blue40</item>
+        <item name="android:textColor">@color/blue</item>
+        <item name="android:textSize">@dimen/text_medium_plus</item>
+        <item name="colorControlActivated">@color/darkBlue</item>
+        <item name="colorControlHighlight">@color/red</item>
+    </style>
     <style name="SearchViewText">
         <item name="android:drawableStart">@drawable/ic_icons_search</item>
         <item name="android:drawableTint">@color/white60</item>

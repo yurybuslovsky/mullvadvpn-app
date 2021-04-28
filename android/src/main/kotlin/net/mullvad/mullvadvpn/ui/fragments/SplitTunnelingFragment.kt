@@ -7,8 +7,14 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.RecyclerView.AdapterDataObserver
+import androidx.transition.ChangeBounds
+import androidx.transition.Transition
+import androidx.transition.TransitionManager
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -28,6 +34,7 @@ import net.mullvad.mullvadvpn.model.ListItemData
 import net.mullvad.mullvadvpn.model.WidgetState.ImageState
 import net.mullvad.mullvadvpn.model.WidgetState.SwitchState
 import net.mullvad.mullvadvpn.model.ListItemData.Companion.APPLICATION
+import net.mullvad.mullvadvpn.model.ListItemData.Companion.SEARCH_INPUT_VIEW
 import net.mullvad.mullvadvpn.model.ListItemData.Companion.SEARCH_VIEW
 import net.mullvad.mullvadvpn.ui.ListItemDividerDecoration
 import net.mullvad.mullvadvpn.ui.ListItemListener
@@ -61,6 +68,21 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
         searchActivateCallback = {
             Log.e("TEST", "SearchClicked")
             safeOffer(Unit)
+            TransitionManager.beginDelayedTransition(view as ViewGroup, changeBounds)
+            appBar?.layoutParams = appBar!!.layoutParams.apply { height = 0 }
+            TransitionManager.endTransitions(view as ViewGroup)
+        }
+        awaitClose {
+            searchActivateCallback = null
+        }
+    }
+    private var searchInputCallback: (() -> Unit)? = null
+    private val searchInput = callbackFlow<String?> {
+        searchInputCallback = {
+            Log.e("TEST", "SearchInputClicked")
+            safeOffer(null)
+            TransitionManager.beginDelayedTransition(view as ViewGroup, changeBounds)
+            appBar?.layoutParams = appBar!!.layoutParams.apply { height = resources.getDimensionPixelSize(R.dimen.expanded_toolbar_height) }
         }
         awaitClose {
             searchActivateCallback = null
@@ -73,11 +95,33 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
                 item.widget is SwitchState -> toggleSystemAppsVisibility.offer(!item.widget.isChecked)
                 item.type == APPLICATION -> toggleExcludeChannel.offer(item)
                 item.type == SEARCH_VIEW -> searchActivateCallback?.invoke()
+                item.type == SEARCH_INPUT_VIEW -> searchInputCallback?.invoke()
             }
         }
     }
 
     private var recyclerView: RecyclerView? = null
+    private val appBar: View?
+        get() = view?.findViewById(R.id.appbar)
+    private val changeBounds = ChangeBounds().apply {
+        addListener(object : Transition.TransitionListener {
+            override fun onTransitionStart(transition: Transition) {
+            }
+
+            override fun onTransitionEnd(transition: Transition) {
+                TransitionManager.endTransitions(view as ViewGroup)
+            }
+
+            override fun onTransitionCancel(transition: Transition) {
+            }
+
+            override fun onTransitionPause(transition: Transition) {
+            }
+
+            override fun onTransitionResume(transition: Transition) {
+            }
+        })
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -95,6 +139,15 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
             )
             tweakMargin(this)
         }
+        listItemsAdapter.registerAdapterDataObserver(object : AdapterDataObserver() {
+            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+                super.onItemRangeInserted(positionStart, itemCount)
+                if (positionStart == 0 && positionStart == (recyclerView!!.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()) {
+                    Log.e("TEST", "scroll to top")
+                    recyclerView!!.layoutManager!!.scrollToPosition(0)
+                }
+            }
+        })
         view.findViewById<View>(R.id.back).setOnClickListener {
             requireActivity().onBackPressed()
         }
@@ -127,7 +180,9 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
         toggleExcludeChannel.consumeAsFlow().map { ViewIntent.ChangeApplicationGroup(it) },
         toggleSystemAppsVisibility.consumeAsFlow().map { ViewIntent.ShowSystemApps(it) },
         searchActivate.map { ViewIntent.SearchApplication("") },
+        searchInput.map { ViewIntent.SearchApplication(it) },
 //        toggleExcludeChannel.consumeAsFlow().map { ViewIntent.ChangeApplicationGroup(it) }
+//>>>>>>> 9fcd60840 (Create serarch input view and transition)
     )
 
     private fun tweakMargin(view: View) {
