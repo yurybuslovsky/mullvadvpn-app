@@ -54,6 +54,7 @@ private constructor(
         const val DOUBLE_ACTION = 4
         const val APPLICATION = 5
         const val SEARCH_VIEW = 6
+        const val SEARCH_INPUT_VIEW = 7
         fun build(identifier: String, setUp: Builder.() -> Unit): ListItemData =
             Builder(identifier).also(setUp).build()
     }
