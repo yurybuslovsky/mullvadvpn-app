@@ -8,13 +8,16 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.widget.EditText
+import androidx.core.view.isVisible
+import androidx.core.widget.doOnTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.AdapterDataObserver
-import androidx.transition.ChangeBounds
-import androidx.transition.Transition
+import androidx.transition.Fade
 import androidx.transition.TransitionManager
+import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -64,59 +67,40 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
     private val searchActivate = callbackFlow<Unit> {
         searchActivateCallback = {
             Log.e("TEST", "SearchClicked")
+            showToolbar = false
             safeOffer(Unit)
-            TransitionManager.beginDelayedTransition(view as ViewGroup, changeBounds)
-            appBar?.layoutParams = appBar!!.layoutParams.apply { height = 0 }
-            TransitionManager.endTransitions(view as ViewGroup)
         }
         awaitClose {
             searchActivateCallback = null
         }
     }
-    private var searchInputCallback: (() -> Unit)? = null
+    private var searchInputCallback: ((String?) -> Unit)? = null
     private val searchInput = callbackFlow<String?> {
-        searchInputCallback = {
+        searchInputCallback = { term ->
             Log.e("TEST", "SearchInputClicked")
-            safeOffer(null)
-            TransitionManager.beginDelayedTransition(view as ViewGroup, changeBounds)
-            appBar?.layoutParams = appBar!!.layoutParams.apply { height = resources.getDimensionPixelSize(R.dimen.expanded_toolbar_height) }
+            showToolbar = term == null
+            safeOffer(term)
         }
         awaitClose {
             searchActivateCallback = null
         }
     }
+    private var showToolbar = true
     private val listItemListener = object : ListItemListener {
         override fun onItemAction(item: ListItemData) {
             when (item.type) {
                 APPLICATION -> toggleExcludeChannel.offer(item)
                 SEARCH_VIEW -> searchActivateCallback?.invoke()
-                SEARCH_INPUT_VIEW -> searchInputCallback?.invoke()
+                SEARCH_INPUT_VIEW -> searchInputCallback?.invoke(null)
             }
         }
     }
 
     private var recyclerView: RecyclerView? = null
-    private val appBar: View?
+    private val appBar: AppBarLayout?
         get() = view?.findViewById(R.id.appbar)
-    private val changeBounds = ChangeBounds().apply {
-        addListener(object : Transition.TransitionListener {
-            override fun onTransitionStart(transition: Transition) {
-            }
-
-            override fun onTransitionEnd(transition: Transition) {
-                TransitionManager.endTransitions(view as ViewGroup)
-            }
-
-            override fun onTransitionCancel(transition: Transition) {
-            }
-
-            override fun onTransitionPause(transition: Transition) {
-            }
-
-            override fun onTransitionResume(transition: Transition) {
-            }
-        })
-    }
+    private val searchInputText: EditText?
+        get() = view?.findViewById(R.id.searchInput)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -151,6 +135,11 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
             viewModel.listItems
                 .onEach {
                     listItemsAdapter.setItems(it)
+                    Log.e("test", "showToolbar: $showToolbar")
+                    if (showToolbar)
+                        showToolbar()
+                    else
+                        hideToolbar()
                 }
                 .catch { }
                 .collect()
@@ -161,6 +150,14 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
                 .onEach { viewModel.processIntent(it) }
                 .collect()
         }
+        view.findViewById<View>(R.id.cancelButton)?.setOnClickListener {
+            searchInputCallback?.invoke(null)
+        }
+
+        searchInputText?.doOnTextChanged { text, start, before, count ->
+            Log.e("tesst", "textChanged: $text $start | $before | $count")
+            searchInputCallback?.invoke(text.toString())
+        }
     }
 
     override fun onDestroy() {
@@ -168,6 +165,31 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
         recyclerView?.adapter = null
         scope.close()
         super.onDestroy()
+    }
+
+    private fun hideToolbar() {
+        TransitionManager.beginDelayedTransition(view as ViewGroup, Fade())
+        view?.findViewById<View>(R.id.search_input)?.isVisible = true
+        view?.findViewById<View>(R.id.back)?.isVisible = false
+        val hh: Int = view?.findViewById<View>(R.id.toolbar)?.height ?: 0
+        appBar?.layoutParams = appBar!!.layoutParams.apply { height = hh }
+        view?.findViewById<View>(R.id.collapsing_toolbar)?.layoutParams = view?.findViewById<View>(R.id.collapsing_toolbar)!!.layoutParams.apply { height = hh }
+        view?.findViewById<CollapsingToolbarLayout>(R.id.collapsing_toolbar)?.isTitleEnabled = false
+    }
+
+    private fun showToolbar() {
+        TransitionManager.beginDelayedTransition(view as ViewGroup, Fade())
+        view?.findViewById<View>(R.id.search_input)?.isVisible = false
+        view?.findViewById<View>(R.id.back)?.isVisible = true
+        val pos = (recyclerView?.layoutManager as? LinearLayoutManager)?.findFirstCompletelyVisibleItemPosition().also {
+            Log.e("test", "first visible item position $it")
+        } ?: -1
+        appBar?.apply {
+            layoutParams = layoutParams.apply { height = resources.getDimensionPixelSize(R.dimen.expanded_toolbar_height) }
+            setExpanded(pos < 1, false)
+        }
+        view?.findViewById<View>(R.id.collapsing_toolbar)?.layoutParams = view?.findViewById<View>(R.id.collapsing_toolbar)!!.layoutParams.apply { height = resources.getDimensionPixelSize(R.dimen.expanded_toolbar_height) }
+        view?.findViewById<CollapsingToolbarLayout>(R.id.collapsing_toolbar)?.isTitleEnabled = true
     }
 
     private fun intents(): Flow<ViewIntent> = merge(
