@@ -80,7 +80,8 @@ class SplitTunnelingViewModel(
                 publishList()
             }
             is ViewIntent.SearchApplication -> {
-                publishList(viewIntent.term != null)
+                if (isUIReady.isCompleted)
+                    publishList(viewIntent.term)
             }
             // else -> Log.e("mullvad", "Unhandled ViewIntent: $viewIntent")
         }
@@ -113,51 +114,77 @@ class SplitTunnelingViewModel(
         publishList()
     }
 
-    private suspend fun publishList(searchItem: Boolean = false) {
+    private suspend fun publishList(searchItem: String? = null) {
         val listItems = ArrayList(
-            if (searchItem) {
-                listOf(
-                    createDivider(0),  createSearchItem(R.string.search_hint)
-                    //createSearchInputItem(R.string.search_hint)
-                )
+            if (searchItem != null) {
+                emptyList()
             } else {
                 defaultListItems
             }
         )
         if (excludedApps.isNotEmpty()) {
-            listItems += createDivider(1)
-            listItems += createMainItem(R.string.exclude_applications)
-            listItems += excludedApps.values.sortedBy { it.name }.take(
-                if (searchItem) {
-                    excludedApps.values.size
-                } else {
-                    excludedApps.values.size
+            excludedApps.values.sortedBy { it.name }
+                .filter { appData ->
+                    if (searchItem != null) {
+                        appData.name.contains(searchItem, ignoreCase = true)
+                    } else {
+                        true
+                    }
+                }.map { info ->
+                    createApplicationItem(info, true)
+                }.takeIf { it.isNotEmpty() }?.run {
+                    listItems += createDivider(1)
+                    listItems += createMainItem(R.string.exclude_applications)
+                    listItems += this
                 }
-            ).map { info ->
-                createApplicationItem(info, true)
-            }
         }
+//<<<<<<< HEAD
 //<<<<<<< HEAD
         val shownNotExcludedApps =
             notExcludedApps.filter { app -> !app.value.isSystemApp || isSystemAppsVisible }
-        if (shownNotExcludedApps.isNotEmpty()) {
-            listItems += createDivider(1)
-            listItems += createSwitchItem(R.string.show_system_apps, isSystemAppsVisible)
+//        if (shownNotExcludedApps.isNotEmpty()) {
+//            listItems += createDivider(1)
+//            listItems += createSwitchItem(R.string.show_system_apps, isSystemAppsVisible)
 //=======
 //        if (notExcludedApps.isNotEmpty()) {
 //            listItems += createDivider(2)
 //>>>>>>> 11fa3acb7 (Init filter view)
-            listItems += createMainItem(R.string.all_applications)
-            listItems += shownNotExcludedApps.values.sortedBy { it.name }
-                .take(
-                    if (searchItem) {
-                        notExcludedApps.values.size
+
+
+//            listItems += createMainItem(R.string.all_applications)
+//            listItems += shownNotExcludedApps.values.sortedBy { it.name }
+//                .take(
+//                    if (searchItem) {
+//                        notExcludedApps.values.size
+
+
+
+//=======
+        if (shownNotExcludedApps.isNotEmpty()) {
+            shownNotExcludedApps.values.sortedBy { it.name }
+                .filter { appData ->
+                    if (searchItem != null) {
+                        appData.name.contains(searchItem, ignoreCase = true)
                     } else {
-                        notExcludedApps.values.size
+                        true
                     }
-                ).map { info ->
+                }.map { info ->
                     createApplicationItem(info, false)
+                }.takeIf { it.isNotEmpty() }?.run {
+                    listItems += createDivider(2)
+                    listItems += createMainItem(R.string.all_applications)
+                    listItems += this
                 }
+        }
+        if (searchItem != null && listItems.isEmpty()) {
+            listItems.add(
+                ListItemData.build("text_no_search_results") {
+                    type = ListItemData.PLAIN
+                    text = "No results for $searchItem. \n" +
+                        "Try a different search."
+                    action = ListItemData.ItemAction(text.toString())
+                }
+            )
         }
         listItemsSink.emit(listItems)
     }
@@ -193,13 +220,6 @@ class SplitTunnelingViewModel(
     private fun createSearchItem(@StringRes text: Int): ListItemData =
         ListItemData.build("search_$text") {
             type = ListItemData.SEARCH_VIEW
-            textRes = text
-            action = ListItemData.ItemAction(text.toString())
-        }
-
-    private fun createSearchInputItem(@StringRes text: Int): ListItemData =
-        ListItemData.build("search_$text") {
-            type = ListItemData.SEARCH_INPUT_VIEW
             textRes = text
             action = ListItemData.ItemAction(text.toString())
         }
