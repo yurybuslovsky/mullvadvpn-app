@@ -80,7 +80,7 @@ impl TunnelState for DisconnectedState {
             }
             Some(TunnelCommand::AllowEndpoint(endpoint, tx)) => {
                 if shared_values.set_allowed_endpoint(endpoint) {
-                    Self::set_firewall_policy(shared_values, true);
+                    Self::set_firewall_policy(shared_values, false);
                 }
                 if let Err(_) = tx.send(()) {
                     log::error!("The AllowEndpoint receiver was dropped");
