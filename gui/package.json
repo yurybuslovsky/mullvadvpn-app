@@ -30,7 +30,7 @@
     "uuid": "^3.0.1"
   },
   "optionalDependencies": {
-    "grpc-tools": "^1.10.0",
+    "grpc-tools": "^1.11.2",
     "nseventmonitor": "^1.0.0"
   },
   "devDependencies": {
@@ -71,7 +71,7 @@
     "eslint-plugin-prettier": "^3.4.0",
     "eslint-plugin-react": "^7.23.2",
     "gettext-extractor": "^3.5.2",
-    "grpc_tools_node_protoc_ts": "^5.1.1",
+    "grpc_tools_node_protoc_ts": "^5.3.0",
     "gulp": "^4.0.2",
     "gulp-inject-string": "^1.1.2",
     "gulp-sourcemaps": "^2.6.5",
