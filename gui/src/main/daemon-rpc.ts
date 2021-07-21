@@ -59,12 +59,6 @@ import consumePromise from '../shared/promise';
 const NETWORK_CALL_TIMEOUT = 10000;
 const CHANNEL_STATE_TIMEOUT = 1000 * 60 * 60;
 
-const ManagementServiceClient = grpc.makeClientConstructor(
-  // @ts-ignore
-  managementInterface['mullvad_daemon.management_interface.ManagementService'],
-  'ManagementService',
-);
-
 const noConnectionError = new Error('No connection established to daemon');
 const configNotSupported = new Error('Setting custom settings is not supported');
 const invalidErrorStateCause = new Error(
@@ -129,11 +123,11 @@ export class DaemonRpc {
   private reconnectionTimeout?: number;
 
   constructor(connectionParams: string) {
-    this.client = (new ManagementServiceClient(
+    this.client = new managementInterface.ManagementServiceClient(
       connectionParams,
       grpc.credentials.createInsecure(),
       this.channelOptions(),
-    ) as unknown) as managementInterface.ManagementServiceClient;
+    );
   }
 
   public connect(): Promise<void> {
