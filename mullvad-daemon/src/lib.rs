@@ -6,6 +6,7 @@ extern crate serde;
 
 mod account;
 pub mod account_history;
+mod device;
 pub mod exception_logging;
 mod geoip;
 pub mod logging;
