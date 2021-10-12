@@ -1,6 +1,7 @@
 package net.mullvad.mullvadvpn.ui.listitemview
 
 import android.content.Context
+import android.view.Gravity
 import android.widget.TextView
 import androidx.appcompat.view.ContextThemeWrapper
 import net.mullvad.mullvadvpn.R
@@ -21,10 +22,14 @@ class PlainListItemView(context: Context) :
             plainText.setText(it)
             return
         }
+
+
         itemData.text?.let {
             plainText.text = it
             return
         }
+        plainText.gravity = Gravity.CENTER
+        plainText.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         plainText.text = ""
     }
 }

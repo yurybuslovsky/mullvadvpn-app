@@ -1,5 +1,6 @@
 package net.mullvad.mullvadvpn.model
 
+import android.text.SpannedString
 import androidx.annotation.DrawableRes
 import androidx.annotation.IntDef
 import androidx.annotation.StringRes
@@ -8,7 +9,7 @@ import java.lang.IllegalArgumentException
 data class ListItemData
 private constructor(
     val identifier: String,
-    val text: String? = null,
+    val text: SpannedString? = null,
     @StringRes val textRes: Int? = null,
     @DrawableRes val iconRes: Int?,
     val isSelected: Boolean,
@@ -22,7 +23,7 @@ private constructor(
     annotation class ItemType
 
     class Builder(private val identifier: String) {
-        var text: String? = null
+        var text: SpannedString? = null
         @StringRes
         var textRes: Int? = null
         @DrawableRes

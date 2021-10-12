@@ -1,6 +1,15 @@
 package net.mullvad.mullvadvpn.viewmodel
 
+import android.text.Layout
+import android.text.SpannedString
+import android.text.style.AlignmentSpan
+import android.text.style.SuperscriptSpan
+import android.view.Gravity
 import androidx.annotation.StringRes
+import androidx.core.text.bold
+import androidx.core.text.buildSpannedString
+import androidx.core.text.toSpannable
+import androidx.core.text.toSpanned
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CompletableDeferred
@@ -19,6 +28,12 @@ import net.mullvad.mullvadvpn.applist.ViewIntent
 import net.mullvad.mullvadvpn.model.ListItemData
 import net.mullvad.mullvadvpn.model.WidgetState
 import net.mullvad.mullvadvpn.ui.serviceconnection.SplitTunneling
+import android.text.Spanned
+
+import android.R.string
+
+
+
 
 class SplitTunnelingViewModel(
     private val appsProvider: ApplicationsProvider,
@@ -177,11 +192,20 @@ class SplitTunnelingViewModel(
                 }
         }
         if (searchItem != null && listItems.isEmpty()) {
+            listItems.add(createDivider(1))
+
+            val formattedText: SpannedString = buildSpannedString {
+                append("No results for ")
+                bold { append(searchItem) }
+                append(".\nTry a different search.")
+                setSpan(AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER), 0,
+                        length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+
             listItems.add(
                 ListItemData.build("text_no_search_results") {
                     type = ListItemData.PLAIN
-                    text = "No results for $searchItem. \n" +
-                        "Try a different search."
+                    text = formattedText
                     action = ListItemData.ItemAction(text.toString())
                 }
             )
@@ -192,7 +216,7 @@ class SplitTunnelingViewModel(
     private fun createApplicationItem(appData: AppData, checked: Boolean): ListItemData =
         ListItemData.build(appData.packageName) {
             type = ListItemData.APPLICATION
-            text = appData.name
+            text = SpannedString.valueOf(appData.name)
             iconRes = appData.iconRes
             action = ListItemData.ItemAction(appData.packageName)
             widget = WidgetState.ImageState(
