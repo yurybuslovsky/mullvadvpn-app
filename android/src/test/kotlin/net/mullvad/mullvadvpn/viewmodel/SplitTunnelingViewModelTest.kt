@@ -1,5 +1,7 @@
 package net.mullvad.mullvadvpn.viewmodel
 
+import android.text.SpannableString
+import android.text.SpannedString
 import androidx.annotation.StringRes
 import androidx.lifecycle.viewModelScope
 import io.mockk.Runs
@@ -216,7 +218,7 @@ class SplitTunnelingViewModelTest {
         checked: Boolean
     ): ListItemData = ListItemData.build(appData.packageName) {
         type = ListItemData.APPLICATION
-        text = appData.name
+        text = SpannedString.valueOf(appData.name)
         iconRes = appData.iconRes
         action = ListItemData.ItemAction(appData.packageName)
         widget = WidgetState.ImageState(
