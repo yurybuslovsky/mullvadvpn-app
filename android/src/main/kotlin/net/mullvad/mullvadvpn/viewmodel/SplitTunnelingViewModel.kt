@@ -1,25 +1,18 @@
 package net.mullvad.mullvadvpn.viewmodel
 
 import android.text.Layout
+import android.text.Spanned
 import android.text.SpannedString
 import android.text.style.AlignmentSpan
-import android.text.style.SuperscriptSpan
-import android.view.Gravity
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
-import androidx.core.text.toSpannable
-import androidx.core.text.toSpanned
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import net.mullvad.mullvadvpn.R
 import net.mullvad.mullvadvpn.applist.AppData
@@ -28,11 +21,6 @@ import net.mullvad.mullvadvpn.applist.ViewIntent
 import net.mullvad.mullvadvpn.model.ListItemData
 import net.mullvad.mullvadvpn.model.WidgetState
 import net.mullvad.mullvadvpn.ui.serviceconnection.SplitTunneling
-import android.text.Spanned
-
-import android.R.string
-
-
 
 
 class SplitTunnelingViewModel(
@@ -77,7 +65,10 @@ class SplitTunnelingViewModel(
         super.onCleared()
     }
 
+    var searchTerm: String? = null
+
     private suspend fun handleIntents(viewIntent: ViewIntent) {
+        Log.d("TEST", "viewIntent: $viewIntent")
         when (viewIntent) {
             is ViewIntent.ChangeApplicationGroup -> {
                 viewIntent.item.action?.let {
@@ -86,17 +77,19 @@ class SplitTunnelingViewModel(
                     } else {
                         addToExcluded(it.identifier)
                     }
-                    publishList()
+                    publishList(searchTerm)
                 }
             }
             is ViewIntent.ViewIsReady -> isUIReady.complete(Unit)
             is ViewIntent.ShowSystemApps -> {
                 isSystemAppsVisible = viewIntent.show
-                publishList()
+                publishList(searchTerm)
             }
             is ViewIntent.SearchApplication -> {
-                if (isUIReady.isCompleted)
+                if (isUIReady.isCompleted) {
                     publishList(viewIntent.term)
+                    searchTerm = viewIntent.term
+                }
             }
             // else -> Log.e("mullvad", "Unhandled ViewIntent: $viewIntent")
         }
@@ -126,7 +119,7 @@ class SplitTunnelingViewModel(
                 notExcludedAppsList.map { it.packageName to it }.toMap(notExcludedApps)
             }
         isUIReady.await()
-        publishList()
+        publishList(searchTerm)
     }
 
     private suspend fun publishList(searchItem: String? = null) {
@@ -153,6 +146,7 @@ class SplitTunnelingViewModel(
                     listItems += this
                 }
         }
+
 //<<<<<<< HEAD
 //<<<<<<< HEAD
         val shownNotExcludedApps =
