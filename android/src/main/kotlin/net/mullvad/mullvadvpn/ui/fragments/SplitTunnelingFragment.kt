@@ -52,6 +52,15 @@ import org.koin.androidx.viewmodel.ViewModelOwner
 import org.koin.androidx.viewmodel.scope.viewModel
 import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
+import android.view.inputmethod.InputMethodManager
+
+import android.R.attr.name
+import android.content.Context
+import android.R.attr.name
+
+
+
+
 
 class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
     private val listItemsAdapter = ListItemsAdapter()
@@ -73,6 +82,9 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
         searchActivateCallback = {
             Log.e("TEST", "SearchClicked")
             showToolbar = false
+            searchInputText?.requestFocus()
+            val inputMethodManager = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0)
             safeOffer(Unit)
         }
         awaitClose {
@@ -160,6 +172,8 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
         view.findViewById<View>(R.id.cancelButton)?.setOnClickListener {
             Toast.makeText(context, "cancel", Toast.LENGTH_SHORT).show()
             searchInputCallback?.invoke(null)
+            val inputMethodManager = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            inputMethodManager.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
         }
         view.findViewById<View>(R.id.clearButton)?.setOnClickListener {
             searchInputText?.text?.clear()
