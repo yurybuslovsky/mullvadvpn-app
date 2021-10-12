@@ -1,7 +1,9 @@
 package net.mullvad.mullvadvpn.ui.listitemview
 
 import android.content.Context
+import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.core.content.res.ResourcesCompat
 import net.mullvad.mullvadvpn.R

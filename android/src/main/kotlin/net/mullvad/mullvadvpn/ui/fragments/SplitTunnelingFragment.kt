@@ -9,6 +9,8 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.TextView
+import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.core.widget.doOnTextChanged
 import androidx.lifecycle.lifecycleScope
@@ -156,7 +158,13 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
                 .collect()
         }
         view.findViewById<View>(R.id.cancelButton)?.setOnClickListener {
+            Toast.makeText(context, "cancel", Toast.LENGTH_SHORT).show()
             searchInputCallback?.invoke(null)
+        }
+        view.findViewById<View>(R.id.clearButton)?.setOnClickListener {
+            searchInputText?.text?.clear()
+            Toast.makeText(context, "clear", Toast.LENGTH_SHORT).show()
+            //searchInputCallback?.invoke(null)
         }
 
         searchInputText?.doOnTextChanged { text, start, before, count ->
