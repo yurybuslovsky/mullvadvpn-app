@@ -170,14 +170,14 @@ class SplitTunnelingFragment : BaseFragment(R.layout.collapsed_title_layout) {
                 .collect()
         }
         view.findViewById<View>(R.id.cancelButton)?.setOnClickListener {
-            Toast.makeText(context, "cancel", Toast.LENGTH_SHORT).show()
+           // Toast.makeText(context, "cancel", Toast.LENGTH_SHORT).show()
             searchInputCallback?.invoke(null)
             val inputMethodManager = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             inputMethodManager.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
         }
         view.findViewById<View>(R.id.clearButton)?.setOnClickListener {
             searchInputText?.text?.clear()
-            Toast.makeText(context, "clear", Toast.LENGTH_SHORT).show()
+           // Toast.makeText(context, "clear", Toast.LENGTH_SHORT).show()
             //searchInputCallback?.invoke(null)
         }
 

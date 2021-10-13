@@ -65,7 +65,18 @@ class SplitTunnelingViewModel(
         super.onCleared()
     }
 
-    var searchTerm: String = ""
+    data class AppFilter(val isActive: Boolean, val term: String = "") {
+        fun applyFilter(input: String): Boolean {
+            return isActive.not() || input.contains(term, ignoreCase = true)
+        }
+
+        companion object {
+            val ACTIVE_EMPTY = AppFilter(true, "")
+            val INACTIVE_EMPTY = AppFilter(false, "")
+        }
+    }
+
+    var appFilterCache = AppFilter.INACTIVE_EMPTY
 
     private suspend fun handleIntents(viewIntent: ViewIntent) {
         Log.d("TEST", "viewIntent: $viewIntent")
@@ -77,18 +88,23 @@ class SplitTunnelingViewModel(
                     } else {
                         addToExcluded(it.identifier)
                     }
-                    publishList(searchTerm)
+                    publishList(appFilterCache)
                 }
             }
             is ViewIntent.ViewIsReady -> isUIReady.complete(Unit)
             is ViewIntent.ShowSystemApps -> {
                 isSystemAppsVisible = viewIntent.show
-                publishList(searchTerm)
+                publishList(appFilterCache)
             }
             is ViewIntent.SearchApplication -> {
                 if (isUIReady.isCompleted) {
-                    publishList(viewIntent.term)
-                    searchTerm = viewIntent.term
+                    appFilterCache = if (viewIntent.term == null) {
+                        AppFilter.INACTIVE_EMPTY
+                    } else {
+                        AppFilter(true, viewIntent.term)
+                    }
+
+                    publishList(appFilterCache)
                 }
             }
             // else -> Log.e("mullvad", "Unhandled ViewIntent: $viewIntent")
@@ -119,14 +135,16 @@ class SplitTunnelingViewModel(
                 notExcludedAppsList.map { it.packageName to it }.toMap(notExcludedApps)
             }
         isUIReady.await()
-        publishList(searchTerm)
+        publishList(appFilterCache)
     }
 
-    private suspend fun publishList(searchItem: String) {
+    private suspend fun publishList(filter: AppFilter) {
+
+        Log.d("WIP", "filter: $filter")
 
         // Show top information unless the user is in the search-state
         val listItems = ArrayList(
-            if (searchItem.isNotEmpty()) {
+            if (filter.isActive) {
                 emptyList()
             } else {
                 defaultListItems
@@ -134,79 +152,62 @@ class SplitTunnelingViewModel(
         )
 
         // Show filtered excluded apps regardless of system app toggle
-        excludedApps.values
+        val filteredExcludedApps = excludedApps.values
                 .sortedBy { it.name }
-                .filter { appData -> appData.name.contains(searchItem, ignoreCase = true) }
-                .map { info -> createApplicationItem(info, true) }
+                .filter { appData -> filter.applyFilter(appData.name) }
+
+        filteredExcludedApps.map { info -> createApplicationItem(info, true) }
                 .takeIf { it.isNotEmpty() }?.run {
                     listItems += createDivider(1)
                     listItems += createMainItem(R.string.exclude_applications)
                     listItems += this
                 }
 
-
-//<<<<<<< HEAD
-//<<<<<<< HEAD
-
-//        if (shownNotExcludedApps.isNotEmpty()) {
-//            listItems += createDivider(1)
-//            listItems += createSwitchItem(R.string.show_system_apps, isSystemAppsVisible)
-//=======
-//        if (notExcludedApps.isNotEmpty()) {
-//            listItems += createDivider(2)
-//>>>>>>> 11fa3acb7 (Init filter view)
-
-
-//            listItems += createMainItem(R.string.all_applications)
-//            listItems += shownNotExcludedApps.values.sortedBy { it.name }
-//                .take(
-//                    if (searchItem) {
-//                        notExcludedApps.values.size
-
-
-
-//=======
-
-        val shownNotExcludedApps = notExcludedApps
+        // Prepare non-excluded app list which might also be used to determine whether the
+        // "Show system apps" toggle should be shown.
+        val filteredNonExcludedApps = notExcludedApps
                 .filter { app -> !app.value.isSystemApp || isSystemAppsVisible }
-                .filter { (appName, _) -> appName.contains(searchItem, ignoreCase = true) }
+                .filter { (appName, _) -> filter.applyFilter(appName) }
 
+        fun doShowSystemApp(): Boolean {
+            return true
+            //return filteredNonExcludedApps.isNotEmpty()
+        }
 
-        val filtered = if (shownNotExcludedApps.isNotEmpty()) {
-            listOf<ListItemData>().apply {
+        if (doShowSystemApp()) {
                 listItems += createDivider(2)
                 listItems += createSwitchItem(R.string.show_system_apps, isSystemAppsVisible)
-            }
-        } else {
-            listOf()
         }
 
             // TODO: Needs to be hidden in certain cases, e.g. when hiding system apps and only a
                 // specific system app is matching the filter/term
 
-
-            shownNotExcludedApps.values.sortedBy { it.name }
-                .filter { appData ->
-                    if (searchItem != null) {
-                        appData.name.contains(searchItem, ignoreCase = true)
-                    } else {
-                        true
-                    }
-                }.map { info ->
+        filteredNonExcludedApps.values
+                .sortedBy { it.name }.map { info ->
                     createApplicationItem(info, false)
-                }.takeIf { it.isNotEmpty() }?.run {
-                    listItems += createDivider(2)
+                }
+                .takeIf { it.isNotEmpty() }?.run {
                     listItems += createMainItem(R.string.all_applications)
                     listItems += this
                 }
 
-        if (searchItem != null && (listItems.isEmpty() ||  )) {
+        fun showNoResults(): Boolean {
+            return filter.isActive && filteredExcludedApps.isEmpty() && filteredNonExcludedApps.isEmpty()
+        }
+
+        if (showNoResults()) {
             listItems.add(createDivider(1))
 
             val formattedText: SpannedString = buildSpannedString {
                 append("No results for ")
-                bold { append(searchItem) }
-                append(".\nTry a different search.")
+                bold { append(filter.term) }
+
+                if (isSystemAppsVisible) {
+                    append(".\nTry a different search.")
+                } else {
+                    append(".\nTry a different search or toggle \"Show system apps\".")
+                }
+
                 setSpan(AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER), 0,
                         length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
