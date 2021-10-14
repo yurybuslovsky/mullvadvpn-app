@@ -551,10 +551,12 @@ class TunnelManager {
 
             switch (verificationResult, tunnelSettingsResult) {
             case (.success(true), .success(let keychainEntry)):
-                self.tunnelInfo = TunnelInfo(token: accountToken, tunnelSettings: keychainEntry.tunnelSettings)
-                self.setTunnelProvider(tunnelProvider: tunnelProvider)
-
-                return .success(())
+                return setRouteAllTrafficViaTunnelIfNeeded(tunnelProvider: tunnelProvider)
+                    .receive(on: stateQueue)
+                    .onSuccess { _ in
+                        self.tunnelInfo = TunnelInfo(token: accountToken, tunnelSettings: keychainEntry.tunnelSettings)
+                        self.setTunnelProvider(tunnelProvider: tunnelProvider)
+                    }
 
             // Remove the tunnel when failed to verify it but successfuly loaded the tunnel
             // settings.
@@ -681,6 +683,29 @@ class TunnelManager {
 
         // Update the existing state
         updateTunnelState()
+    }
+
+    private func setRouteAllTrafficViaTunnelIfNeeded(tunnelProvider: TunnelProviderManagerType) -> Result<(), TunnelManager.Error>.Promise {
+        guard #available(iOS 15, *) else { return .success(()) }
+
+        guard let protocolConfiguration = tunnelProvider.protocolConfiguration,
+              !protocolConfiguration.includeAllNetworks || !protocolConfiguration.excludeLocalNetworks else { return .success(()) }
+
+        logger.debug("Upgrade VPN configuration to enable routing all traffic via tunnel")
+
+        Self.setRouteAllTrafficViaTunnel(protocolConfiguration: protocolConfiguration)
+
+        return tunnelProvider.saveToPreferences()
+            .mapError { error in
+                return .saveUpgradedVPNConfiguration(error)
+            }
+    }
+
+    private class func setRouteAllTrafficViaTunnel(protocolConfiguration: NEVPNProtocol) {
+        if #available(iOS 15.0, *) {
+            protocolConfiguration.includeAllNetworks = true
+            protocolConfiguration.excludeLocalNetworks = true
+        }
     }
 
     private func unregisterConnectionObserver() {
@@ -977,6 +1002,8 @@ class TunnelManager {
                 protocolConfig.serverAddress = ""
                 protocolConfig.username = accountToken
                 protocolConfig.passwordReference = passwordReference
+
+                Self.setRouteAllTrafficViaTunnel(protocolConfiguration: protocolConfig)
 
                 tunnelProvider.isEnabled = true
                 tunnelProvider.localizedDescription = "WireGuard"

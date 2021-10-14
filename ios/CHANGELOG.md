@@ -38,6 +38,9 @@ Line wrap the file at 100 chars.                                              Th
 ### Security
 - Move REST API networking from the packet tunnel process to the main process to prevent leaking 
   traffic outside of the tunnel.
+- Enable `includeAllNetworks` configuration on iOS 15 or newer, which prevents a VPN bypass for 
+  network connections established prior to VPN tunnel.
+
 
 ## [2021.3] - 2021-08-10
 ### Added

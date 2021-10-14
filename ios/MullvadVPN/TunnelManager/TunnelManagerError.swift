@@ -23,6 +23,9 @@ extension TunnelManager {
         /// A failure to save the system VPN configuration
         case saveVPNConfiguration(Swift.Error)
 
+        /// A failure to save the upgraded system VPN configuration
+        case saveUpgradedVPNConfiguration(Swift.Error)
+
         /// A failure to reload the system VPN configuration
         case reloadVPNConfiguration(Swift.Error)
 
@@ -79,6 +82,8 @@ extension TunnelManager {
                 return "Failed to load the system VPN configurations"
             case .saveVPNConfiguration:
                 return "Failed to save the system VPN configuration"
+            case .saveUpgradedVPNConfiguration:
+                return "Failed to save the upgraded system VPN configuration"
             case .reloadVPNConfiguration:
                 return "Failed to reload the system VPN configuration"
             case .removeVPNConfiguration:
