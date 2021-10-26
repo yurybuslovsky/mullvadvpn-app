@@ -1,6 +1,8 @@
 use super::{Error, Result};
-use crate::wireguard::{MAX_ROTATION_INTERVAL, MIN_ROTATION_INTERVAL};
-use mullvad_types::settings::SettingsVersion;
+use mullvad_types::{
+    settings::SettingsVersion,
+    wireguard::{MAX_ROTATION_INTERVAL, MIN_ROTATION_INTERVAL},
+};
 use std::time::Duration;
 
 pub fn migrate(settings: &mut serde_json::Value) -> Result<()> {

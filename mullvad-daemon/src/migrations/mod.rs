@@ -9,6 +9,7 @@ mod v1;
 mod v2;
 mod v3;
 mod v4;
+mod v5;
 
 const SETTINGS_FILE: &str = "settings.json";
 
@@ -46,7 +47,13 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub async fn migrate_all(cache_dir: &Path, settings_dir: &Path) -> Result<()> {
+pub(crate) async fn migrate_all(
+    cache_dir: &Path,
+    settings_dir: &Path,
+    runtime: tokio::runtime::Handle,
+    rest_handle: mullvad_rpc::rest::MullvadRestHandle,
+    daemon_tx: crate::DaemonEventSender,
+) -> Result<()> {
     #[cfg(windows)]
     windows::migrate_after_windows_update(settings_dir)
         .await
@@ -74,6 +81,8 @@ pub async fn migrate_all(cache_dir: &Path, settings_dir: &Path) -> Result<()> {
 
     account_history::migrate_location(cache_dir, settings_dir).await;
     account_history::migrate_formats(settings_dir, &mut settings).await?;
+
+    v5::migrate(&mut settings, runtime, rest_handle, daemon_tx).await?;
 
     let buffer = serde_json::to_string_pretty(&settings).map_err(Error::SerializeError)?;
 
