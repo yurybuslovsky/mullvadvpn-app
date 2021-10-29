@@ -859,6 +859,7 @@ where
             cache_dir,
             lock_target_cache,
         ) = self.shutdown();
+
         for future in shutdown_tasks {
             future.await;
         }
@@ -904,13 +905,17 @@ where
     ) {
         let Daemon {
             event_listener,
-            shutdown_tasks,
+            mut shutdown_tasks,
+            account_manager,
             rpc_runtime,
             tunnel_state_machine_shutdown_signal,
             cache_dir,
             lock_target_cache,
             ..
         } = self;
+
+        shutdown_tasks.insert(0, Box::pin(account_manager.finalize()));
+
         (
             event_listener,
             shutdown_tasks,
