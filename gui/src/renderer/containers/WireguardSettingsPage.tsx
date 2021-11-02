@@ -6,7 +6,6 @@ import WireguardSettings from '../components/WireguardSettings';
 
 import withAppContext, { IAppContext } from '../context';
 import { IHistoryProps, withHistory } from '../lib/history';
-import { RoutePath } from '../lib/routes';
 import { RelaySettingsRedux } from '../redux/settings/reducers';
 import { IReduxState, ReduxDispatch } from '../redux/store';
 
@@ -78,8 +77,6 @@ const mapDispatchToProps = (_dispatch: ReduxDispatch, props: IHistoryProps & IAp
         log.error('Failed to update mtu value', error.message);
       }
     },
-
-    onViewWireguardKeys: () => props.history.push(RoutePath.wireguardKeys),
   };
 };
 
