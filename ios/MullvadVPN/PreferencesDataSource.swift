@@ -280,16 +280,6 @@ class PreferencesDataSource: NSObject, UITableViewDataSource, UITableViewDelegat
         }
     }
 
-    func tableView(_ tableView: UITableView, indentationLevelForRowAt indexPath: IndexPath) -> Int {
-        let item = snapshot.itemForIndexPath(indexPath)
-
-        if case .dnsServer = item, !isEditing {
-            return 1
-        } else {
-            return 0
-        }
-    }
-
     // MARK: - Private
 
     private func registerClasses() {
