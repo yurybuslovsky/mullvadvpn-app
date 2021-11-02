@@ -686,7 +686,7 @@ class TunnelManager {
     }
 
     private func setRouteAllTrafficViaTunnelIfNeeded(tunnelProvider: TunnelProviderManagerType) -> Result<(), TunnelManager.Error>.Promise {
-        guard #available(iOS 15, *) else { return .success(()) }
+        guard #available(iOS 15.1, *) else { return .success(()) }
 
         guard let protocolConfiguration = tunnelProvider.protocolConfiguration,
               !protocolConfiguration.includeAllNetworks || !protocolConfiguration.excludeLocalNetworks else { return .success(()) }
@@ -702,7 +702,7 @@ class TunnelManager {
     }
 
     private class func setRouteAllTrafficViaTunnel(protocolConfiguration: NEVPNProtocol) {
-        if #available(iOS 15.0, *) {
+        if #available(iOS 15.1, *) {
             protocolConfiguration.includeAllNetworks = true
             protocolConfiguration.excludeLocalNetworks = true
         }
