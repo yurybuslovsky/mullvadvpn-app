@@ -188,7 +188,9 @@ class PreferencesDataSource: NSObject, UITableViewDataSource, UITableViewDelegat
               let sourceIndex = viewModel.indexOfDNSEntry(entryIdentifier: sourceIdentifier),
               let destinationIndex = viewModel.indexOfDNSEntry(entryIdentifier: targetIdentifier) else { return }
 
-        viewModel.customDNSDomains.swapAt(sourceIndex, destinationIndex)
+        let removedEntry = viewModel.customDNSDomains.remove(at: sourceIndex)
+        viewModel.customDNSDomains.insert(removedEntry, at: destinationIndex)
+
         updateSnapshot()
     }
 
