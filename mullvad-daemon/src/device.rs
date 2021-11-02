@@ -6,7 +6,7 @@ use futures::{
     stream::StreamExt,
 };
 use mullvad_rpc::{
-    availability::{self, ApiAvailabilityHandle},
+    availability::ApiAvailabilityHandle,
     rest::{self, Error as RestError, MullvadRestHandle},
     AccountsProxy, DevicesProxy,
 };
@@ -51,20 +51,20 @@ pub struct DeviceKeyEvent(pub DeviceData);
 
 #[derive(err_derive::Error, Debug)]
 pub enum Error {
-    #[error(display = "The account has reached the maximum number of devices")]
-    TooManyDevices,
+    #[error(display = "The account already has a maximum number of devices")]
+    MaxDevicesReached,
     #[error(display = "No device is set")]
     NoDevice,
-    #[error(display = "The login attempt was aborted")]
-    LoginAborted,
-    #[error(display = "Unexpected HTTP request error")]
-    RestError(#[error(source)] rest::Error),
-    #[error(display = "API availability check was interrupted")]
-    ApiCheckError(#[error(source)] availability::Error),
+    #[error(display = "Device not found")]
+    InvalidDevice,
+    #[error(display = "Invalid account")]
+    InvalidAccount,
     #[error(display = "Failed to read or write device cache")]
     DeviceIoError(#[error(source)] io::Error),
     #[error(display = "Failed parse device cache")]
     ParseDeviceCache(#[error(source)] serde_json::Error),
+    #[error(display = "Unexpected HTTP request error")]
+    OtherRestError(#[error(source)] rest::Error),
 }
 
 pub(crate) struct AccountManager {
@@ -355,7 +355,8 @@ impl DeviceService {
             constant_interval(RETRY_ACTION_INTERVAL),
             RETRY_ACTION_MAX_RETRIES,
         )
-        .await?;
+        .await
+        .map_err(map_rest_error)?;
 
         Ok(DeviceData {
             token,
@@ -398,7 +399,8 @@ impl DeviceService {
             should_retry_backoff,
             retry_strategy,
         )
-        .await?;
+        .await
+        .map_err(map_rest_error)?;
 
         Ok(DeviceData {
             token,
@@ -420,7 +422,8 @@ impl DeviceService {
             constant_interval(RETRY_ACTION_INTERVAL),
             RETRY_ACTION_MAX_RETRIES,
         )
-        .await?;
+        .await
+        .map_err(map_rest_error)?;
         Ok(())
     }
 
@@ -451,7 +454,8 @@ impl DeviceService {
             should_retry_backoff,
             retry_strategy,
         )
-        .await?;
+        .await
+        .map_err(map_rest_error)?;
 
         Ok(())
     }
@@ -472,7 +476,8 @@ impl DeviceService {
             constant_interval(RETRY_ACTION_INTERVAL),
             RETRY_ACTION_MAX_RETRIES,
         )
-        .await?;
+        .await
+        .map_err(map_rest_error)?;
 
         Ok(WireguardData {
             private_key,
@@ -511,7 +516,8 @@ impl DeviceService {
             should_retry_backoff,
             retry_strategy,
         )
-        .await?;
+        .await
+        .map_err(map_rest_error)?;
 
         Ok(WireguardData {
             private_key,
@@ -530,7 +536,7 @@ impl DeviceService {
             RETRY_ACTION_MAX_RETRIES,
         )
         .await
-        .map_err(Error::RestError)
+        .map_err(map_rest_error)
     }
 
     pub async fn list_devices_with_backoff(
@@ -560,7 +566,7 @@ impl DeviceService {
             retry_strategy,
         )
         .await
-        .map_err(Error::RestError)
+        .map_err(map_rest_error)
     }
 }
 
@@ -796,5 +802,21 @@ fn should_retry_backoff<T>(result: &Result<T, RestError>) -> bool {
                 true
             }
         }
+    }
+}
+
+fn map_rest_error(error: rest::Error) -> Error {
+    match error {
+        RestError::ApiError(status, ref code) => {
+            if status == rest::StatusCode::NOT_FOUND {
+                return Error::InvalidDevice;
+            }
+            match code.as_str() {
+                mullvad_rpc::INVALID_ACCOUNT => Error::InvalidAccount,
+                mullvad_rpc::MAX_DEVICES_REACHED => Error::MaxDevicesReached,
+                _ => Error::OtherRestError(error),
+            }
+        }
+        error => Error::OtherRestError(error),
     }
 }
