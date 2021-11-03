@@ -1,6 +1,7 @@
 export enum RoutePath {
   launch = '/',
   login = '/login',
+  tooManyDevices = '/login/too-many-devices',
   main = '/main',
   redeemVoucher = '/main/voucher/redeem',
   voucherSuccess = '/main/voucher/success',
