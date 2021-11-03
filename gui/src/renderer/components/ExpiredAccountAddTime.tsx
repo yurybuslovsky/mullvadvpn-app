@@ -250,7 +250,7 @@ function HeaderBar() {
 }
 
 function useFinishedCallback() {
-  const { loggedIn } = useActions(account);
+  const { accountSetupFinished } = useActions(account);
 
   const history = useHistory();
   const isNewAccount = useSelector(
@@ -261,11 +261,11 @@ function useFinishedCallback() {
   const callback = useCallback(() => {
     // Changes login method from "new_account" to "existing_account"
     if (isNewAccount) {
-      loggedIn();
+      accountSetupFinished();
     }
 
     history.reset(RoutePath.main, undefined, transitions.push);
-  }, [isNewAccount, loggedIn, history]);
+  }, [isNewAccount, accountSetupFinished, history]);
 
   return callback;
 }

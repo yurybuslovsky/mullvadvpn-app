@@ -8,6 +8,7 @@ export type LoginState =
   | { type: 'failed'; method: LoginMethod; error: Error };
 export interface IAccountReduxState {
   accountToken?: AccountToken;
+  deviceName?: string;
   accountHistory?: AccountToken;
   expiry?: string; // ISO8601
   previousExpiry?: string; // ISO8601
@@ -16,6 +17,7 @@ export interface IAccountReduxState {
 
 const initialState: IAccountReduxState = {
   accountToken: undefined,
+  deviceName: undefined,
   accountHistory: undefined,
   expiry: undefined,
   previousExpiry: undefined,
@@ -37,6 +39,9 @@ export default function (
       return {
         ...state,
         status: { type: 'ok', method: 'existing_account' },
+        previousExpiry: undefined,
+        accountToken: action.accountToken,
+        deviceName: action.deviceName,
       };
     case 'LOGIN_FAILED':
       return {
@@ -71,14 +76,19 @@ export default function (
       return {
         ...state,
         status: { type: 'ok', method: 'new_account' },
-        accountToken: action.token,
-        expiry: action.expiry,
         previousExpiry: undefined,
+        accountToken: action.accountToken,
+        deviceName: action.deviceName,
+        expiry: action.expiry,
+      };
+    case 'ACCOUNT_SETUP_FINISHED':
+      return {
+        status: { type: 'ok', method: 'existing_account' },
       };
     case 'UPDATE_ACCOUNT_TOKEN':
       return {
         ...state,
-        accountToken: action.token,
+        accountToken: action.accountToken,
       };
     case 'UPDATE_ACCOUNT_HISTORY':
       return {

@@ -27,6 +27,7 @@ import {
   DaemonEvent,
   IAccountData,
   IAppVersionInfo,
+  IDeviceConfig,
   IDnsOptions,
   IRelayList,
   ISettings,
@@ -133,7 +134,6 @@ class ApplicationMain {
   private ignoreTunnelStatesUntil?: TunnelState['state'];
   private ignoreTunnelStateFallbackScheduler = new Scheduler();
   private settings: ISettings = {
-    accountToken: undefined,
     allowLan: false,
     autoConnect: false,
     blockWhenDisconnected: false,
@@ -186,6 +186,7 @@ class ApplicationMain {
       },
     },
   };
+  private deviceConfig: IDeviceConfig = { accountToken: undefined, device: undefined };
   private guiSettings = new GuiSettings();
   private tunnelStateExpectation?: Expectation;
 
@@ -666,7 +667,7 @@ class ApplicationMain {
     }
 
     // show window when account is not set
-    if (!this.settings.accountToken) {
+    if (!this.deviceConfig.accountToken) {
       this.windowController?.show();
     }
   };
@@ -737,6 +738,8 @@ class ApplicationMain {
           );
         } else if ('appVersionInfo' in daemonEvent) {
           this.setLatestVersion(daemonEvent.appVersionInfo);
+        } else if ('deviceConfig' in daemonEvent) {
+          this.setDeviceConfig(daemonEvent.deviceConfig);
         }
       },
       (error: Error) => {
@@ -808,13 +811,6 @@ class ApplicationMain {
     this.settings = newSettings;
 
     this.updateTrayIcon(this.tunnelState, newSettings.blockWhenDisconnected);
-
-    // make sure to invalidate the account data cache when account tokens change
-    this.updateAccountDataOnAccountChange(oldSettings.accountToken, newSettings.accountToken);
-
-    if (oldSettings.accountToken !== newSettings.accountToken) {
-      void this.updateAccountHistory();
-    }
 
     if (oldSettings.showBetaReleases !== newSettings.showBetaReleases) {
       this.setLatestVersion(this.upgradeVersion);
@@ -1022,6 +1018,16 @@ class ApplicationMain {
     }
   }
 
+  private setDeviceConfig(deviceConfig: IDeviceConfig) {
+    const oldDeviceConfig = this.deviceConfig;
+    this.deviceConfig = deviceConfig;
+
+    // make sure to invalidate the account data cache when account tokens change
+    this.updateAccountDataOnAccountChange(oldDeviceConfig.accountToken, deviceConfig.accountToken);
+
+    void this.updateAccountHistory();
+  }
+
   private trayIconType(tunnelState: TunnelState, blockWhenDisconnected: boolean): TrayIconType {
     switch (tunnelState.state) {
       case 'connected':
@@ -1099,6 +1105,7 @@ class ApplicationMain {
       accountHistory: this.accountHistory,
       tunnelState: this.tunnelState,
       settings: this.settings,
+      deviceConfig: this.deviceConfig,
       relayListPair: {
         relays: this.processRelaysForPresentation(
           this.relays,
@@ -1200,7 +1207,7 @@ class ApplicationMain {
     IpcMainEventChannel.account.handleLogout(() => this.logout());
     IpcMainEventChannel.account.handleGetWwwAuthToken(() => this.daemonRpc.getWwwAuthToken());
     IpcMainEventChannel.account.handleSubmitVoucher(async (voucherCode: string) => {
-      const currentAccountToken = this.settings.accountToken;
+      const currentAccountToken = this.deviceConfig.accountToken;
       const response = await this.daemonRpc.submitVoucher(voucherCode);
 
       if (currentAccountToken) {
@@ -1388,7 +1395,7 @@ class ApplicationMain {
     if (process.env.NODE_ENV === 'development') {
       log.info('Skip autoconnect in development');
     } else if (
-      this.settings.accountToken &&
+      this.deviceConfig.accountToken &&
       (!this.accountData || !hasExpired(this.accountData.expiry))
     ) {
       if (this.guiSettings.autoConnect) {
@@ -1448,8 +1455,8 @@ class ApplicationMain {
   }
 
   private updateAccountData() {
-    if (this.connectedToDaemon && this.settings.accountToken) {
-      this.accountDataCache.fetch(this.settings.accountToken);
+    if (this.connectedToDaemon && this.deviceConfig.accountToken) {
+      this.accountDataCache.fetch(this.deviceConfig.accountToken);
     }
   }
 
