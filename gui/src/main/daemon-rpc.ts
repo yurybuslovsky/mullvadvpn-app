@@ -46,7 +46,9 @@ import {
   VoucherResponse,
   TunnelProtocol,
   IDnsOptions,
-  IDeviceConfig,
+  DeviceConfig,
+  IDevice,
+  IDeviceRemoval,
 } from '../shared/daemon-rpc-types';
 import log from '../shared/logging';
 
@@ -483,6 +485,37 @@ export class DaemonRpc {
 
   public async setSplitTunnelingState(enabled: boolean): Promise<void> {
     await this.callBool(this.client.setSplitTunnelState, enabled);
+  }
+
+  public async getDevice(): Promise<DeviceConfig> {
+    try {
+      const response = await this.callEmpty<grpcTypes.DeviceConfig>(this.client.getDevice);
+      return convertFromDeviceConfig(response);
+    } catch (e) {
+      const error = e as grpc.ServiceError;
+      if (error.code === grpc.status.NOT_FOUND) {
+        return undefined;
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  public async listDevices(accountToken: AccountToken): Promise<Array<IDevice>> {
+    const response = await this.callString<grpcTypes.DeviceList>(
+      this.client.listDevices,
+      accountToken,
+    );
+
+    return response.toObject().devicesList;
+  }
+
+  public async removeDevice(deviceRemoval: IDeviceRemoval): Promise<void> {
+    const grpcDeviceRemoval = new grpcTypes.DeviceRemoval();
+    grpcDeviceRemoval.setAccountToken(deviceRemoval.accountToken);
+    grpcDeviceRemoval.setDeviceId(deviceRemoval.deviceId);
+
+    await this.call<grpcTypes.DeviceRemoval, Empty>(this.client.removeDevice, grpcDeviceRemoval);
   }
 
   private subscriptionId(): number {
@@ -1100,7 +1133,7 @@ function convertFromDaemonEvent(data: grpcTypes.DaemonEvent): DaemonEvent {
 
   const deviceConfig = data.getDevice();
   if (deviceConfig !== undefined) {
-    return { deviceConfig: convertFromDeviceConfig(deviceConfig) };
+    return { deviceConfig: convertFromDeviceEvent(deviceConfig) };
   }
 
   return {
@@ -1283,12 +1316,17 @@ function convertToTransportProtocol(protocol: RelayProtocol): grpcTypes.Transpor
   }
 }
 
-function convertFromDeviceConfig(deviceEvent: grpcTypes.DeviceEvent): IDeviceConfig {
-  const deviceConfig = deviceEvent.getDevice();
-  return {
-    accountToken: deviceConfig?.getAccountToken(),
-    device: deviceConfig?.getDevice()?.toObject(),
-  };
+function convertFromDeviceEvent(deviceEvent: grpcTypes.DeviceEvent): DeviceConfig {
+  return convertFromDeviceConfig(deviceEvent.getDevice());
+}
+
+function convertFromDeviceConfig(deviceConfig?: grpcTypes.DeviceConfig): DeviceConfig {
+  return (
+    deviceConfig && {
+      accountToken: deviceConfig.getAccountToken(),
+      device: deviceConfig.getDevice()?.toObject(),
+    }
+  );
 }
 
 function ensureExists<T>(value: T | undefined, errorMessage: string): T {

@@ -31,7 +31,9 @@ import {
   BridgeState,
   IAccountData,
   IAppVersionInfo,
-  IDeviceConfig,
+  IDevice,
+  DeviceConfig,
+  IDeviceRemoval,
   IDnsOptions,
   ILocation,
   IRelayList,
@@ -94,7 +96,7 @@ export default class AppRenderer {
   private tunnelState!: TunnelState;
   private optimisticTunnelState?: TunnelState['state'];
   private settings!: ISettings;
-  private deviceConfig!: IDeviceConfig;
+  private deviceConfig: DeviceConfig;
   private guiSettings!: IGuiSettingsState;
   private loginState: 'none' | 'logging in' | 'creating account' = 'none';
   private loginScheduler = new Scheduler();
@@ -123,10 +125,9 @@ export default class AppRenderer {
       this.setAccountExpiry(newAccountData?.expiry, newAccountData?.previousExpiry);
     });
 
-    IpcRendererEventChannel.account.listenDevice((deviceConfig: IDeviceConfig) => {
+    IpcRendererEventChannel.account.listenDevice((deviceConfig: DeviceConfig) => {
       const oldDeviceConfig = this.deviceConfig;
-      this.deviceConfig = deviceConfig;
-      this.handleAccountChange(deviceConfig, oldDeviceConfig.accountToken);
+      this.handleAccountChange(deviceConfig, oldDeviceConfig?.accountToken);
     });
 
     IpcRendererEventChannel.accountHistory.listen((newAccountHistory?: AccountToken) => {
@@ -233,7 +234,7 @@ export default class AppRenderer {
 
     const navigationBase = this.getNavigationBase(
       initialState.isConnected,
-      initialState.deviceConfig.accountToken,
+      initialState.deviceConfig?.accountToken,
     );
     this.history = new History(navigationBase);
   }
@@ -301,6 +302,14 @@ export default class AppRenderer {
 
   public updateAccountData(): void {
     IpcRendererEventChannel.account.updateData();
+  }
+
+  public listDevices(accountToken: AccountToken): Promise<Array<IDevice>> {
+    return IpcRendererEventChannel.account.listDevices(accountToken);
+  }
+
+  public removeDevice(deviceRemoval: IDeviceRemoval): Promise<void> {
+    return IpcRendererEventChannel.account.removeDevice(deviceRemoval);
   }
 
   public async connectTunnel(): Promise<void> {
@@ -642,7 +651,7 @@ export default class AppRenderer {
       const pathname = this.history.location.pathname;
       const nextPath = this.getNavigationBase(
         this.connectedToDaemon,
-        this.deviceConfig.accountToken,
+        this.deviceConfig?.accountToken,
       );
 
       // First level contains the possible next locations and the second level contains the possible
@@ -772,10 +781,11 @@ export default class AppRenderer {
     }
   }
 
-  private handleAccountChange(newDeviceConfig: IDeviceConfig, oldAccount?: string) {
+  private handleAccountChange(newDeviceConfig: DeviceConfig, oldAccount?: string) {
     const reduxAccount = this.reduxActions.account;
 
-    const newAccount = newDeviceConfig.accountToken;
+    this.deviceConfig = newDeviceConfig;
+    const newAccount = newDeviceConfig?.accountToken;
 
     if (oldAccount && !newAccount) {
       this.loginScheduler.cancel();
@@ -783,8 +793,8 @@ export default class AppRenderer {
 
       this.resetNavigation();
     } else if (
-      newDeviceConfig.accountToken !== undefined &&
-      newDeviceConfig.device !== undefined &&
+      newDeviceConfig?.accountToken !== undefined &&
+      newDeviceConfig?.device !== undefined &&
       oldAccount !== newAccount
     ) {
       switch (this.loginState) {
