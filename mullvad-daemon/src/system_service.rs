@@ -116,25 +116,29 @@ pub fn handle_service_main(_arguments: Vec<OsString>) {
         Ok(runtime) => runtime,
     };
 
-    let result = runtime.block_on(crate::create_daemon(log_dir));
-    let result = if let Ok(daemon) = result {
-        let shutdown_handle = daemon.shutdown_handle();
+    let result = match runtime.block_on(crate::create_daemon(log_dir)) {
+        Ok((daemon, join_handle)) => {
+            let shutdown_handle = daemon.shutdown_handle();
 
-        // Register monitor that translates `ServiceControl` to Daemon events
-        start_event_monitor(
-            persistent_service_status.clone(),
-            shutdown_handle,
-            event_rx,
-            clean_shutdown.clone(),
-        );
+            // Register monitor that translates `ServiceControl` to Daemon events
+            start_event_monitor(
+                persistent_service_status.clone(),
+                shutdown_handle,
+                event_rx,
+                clean_shutdown.clone(),
+            );
 
-        persistent_service_status.set_running().unwrap();
+            persistent_service_status.set_running().unwrap();
 
-        runtime
-            .block_on(daemon.run())
-            .map_err(|e| e.display_chain())
-    } else {
-        result.map(|_| ())
+            runtime
+                .block_on(async move {
+                    let result = daemon.run().await;
+                    let _ = join_handle.await;
+                    result
+                })
+                .map_err(|e| e.display_chain())
+        }
+        Err(error) => Err::<(), String>(error),
     };
 
     let exit_code = match result {

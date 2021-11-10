@@ -30,6 +30,8 @@ use std::{
     time::Duration,
 };
 use talpid_types::ErrorExt;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use tokio::fs;
 use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 
 #[derive(err_derive::Error, Debug)]
@@ -722,12 +724,20 @@ impl ManagementServiceImpl {
     }
 }
 
+pub type ManagementInterfaceJoinHandle = tokio::task::JoinHandle<()>;
+
 pub struct ManagementInterfaceServer(());
 
 impl ManagementInterfaceServer {
     pub async fn start(
         tunnel_tx: DaemonCommandSender,
-    ) -> Result<(String, ManagementInterfaceEventBroadcaster), Error> {
+    ) -> Result<
+        (
+            ManagementInterfaceEventBroadcaster,
+            ManagementInterfaceJoinHandle,
+        ),
+        Error,
+    > {
         let subscriptions = Arc::<RwLock<Vec<EventsListenerSender>>>::default();
 
         let socket_path = mullvad_paths::get_rpc_socket_path()
@@ -745,19 +755,27 @@ impl ManagementInterfaceServer {
         .await
         .map_err(Error::SetupError)?;
 
-        tokio::spawn(async move {
+        log::info!("Management interface listening on {}", socket_path);
+
+        let outer_join_handle = tokio::spawn(async move {
             if let Err(error) = join_handle.await {
                 log::error!("Management server panic: {}", error);
+            }
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            if let Err(err) = fs::remove_file(socket_path).await {
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    log::error!("Failed to remove old RPC socket: {}", err);
+                }
             }
             log::info!("Management interface shut down");
         });
 
         Ok((
-            socket_path,
             ManagementInterfaceEventBroadcaster {
                 subscriptions,
                 _close_handle: server_abort_tx,
             },
+            outer_join_handle,
         ))
     }
 }

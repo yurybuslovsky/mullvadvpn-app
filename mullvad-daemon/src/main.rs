@@ -3,10 +3,13 @@
 use log::{debug, error, info, trace, warn};
 use mullvad_daemon::{
     logging,
-    management_interface::{ManagementInterfaceEventBroadcaster, ManagementInterfaceServer},
+    management_interface::{
+        ManagementInterfaceEventBroadcaster, ManagementInterfaceJoinHandle,
+        ManagementInterfaceServer,
+    },
     rpc_uniqueness_check,
     runtime::new_runtime_builder,
-    version, Daemon, DaemonCommandChannel, DaemonCommandSender,
+    version, Daemon, DaemonCommandChannel,
 };
 use std::{path::PathBuf, thread, time::Duration};
 use talpid_types::ErrorExt;
@@ -117,13 +120,18 @@ async fn run_standalone(log_dir: Option<PathBuf>) -> Result<(), String> {
         warn!("Running daemon as a non-administrator user, clients might refuse to connect");
     }
 
-    let daemon = create_daemon(log_dir).await?;
+    let (daemon, interface_join_handle) = create_daemon(log_dir).await?;
 
     let shutdown_handle = daemon.shutdown_handle();
     shutdown::set_shutdown_signal_handler(move || shutdown_handle.shutdown())
         .map_err(|e| e.display_chain())?;
 
-    daemon.run().await.map_err(|e| e.display_chain())?;
+    async move {
+        let result = daemon.run().await.map_err(|e| e.display_chain());
+        let _ = interface_join_handle.await;
+        result
+    }
+    .await?;
 
     info!("Mullvad daemon is quitting");
     thread::sleep(Duration::from_millis(500));
@@ -132,7 +140,13 @@ async fn run_standalone(log_dir: Option<PathBuf>) -> Result<(), String> {
 
 async fn create_daemon(
     log_dir: Option<PathBuf>,
-) -> Result<Daemon<ManagementInterfaceEventBroadcaster>, String> {
+) -> Result<
+    (
+        Daemon<ManagementInterfaceEventBroadcaster>,
+        ManagementInterfaceJoinHandle,
+    ),
+    String,
+> {
     let resource_dir = mullvad_paths::get_resource_dir();
     let settings_dir = mullvad_paths::settings_dir()
         .map_err(|e| e.display_chain_with_msg("Unable to get settings dir"))?;
@@ -140,9 +154,13 @@ async fn create_daemon(
         .map_err(|e| e.display_chain_with_msg("Unable to get cache dir"))?;
 
     let command_channel = DaemonCommandChannel::new();
-    let event_listener = spawn_management_interface(command_channel.sender()).await?;
+    let (event_listener, join_handle) = ManagementInterfaceServer::start(command_channel.sender())
+        .await
+        .map_err(|error| {
+            error.display_chain_with_msg("Unable to start management interface server")
+        })?;
 
-    Daemon::start(
+    let daemon = Daemon::start(
         log_dir,
         resource_dir,
         settings_dir,
@@ -151,21 +169,9 @@ async fn create_daemon(
         command_channel,
     )
     .await
-    .map_err(|e| e.display_chain_with_msg("Unable to initialize daemon"))
-}
+    .map_err(|e| e.display_chain_with_msg("Unable to initialize daemon"))?;
 
-async fn spawn_management_interface(
-    command_sender: DaemonCommandSender,
-) -> Result<ManagementInterfaceEventBroadcaster, String> {
-    let (socket_path, event_broadcaster) = ManagementInterfaceServer::start(command_sender)
-        .await
-        .map_err(|error| {
-        error.display_chain_with_msg("Unable to start management interface server")
-    })?;
-
-    info!("Management interface listening on {}", socket_path);
-
-    Ok(event_broadcaster)
+    Ok((daemon, join_handle))
 }
 
 #[cfg(unix)]

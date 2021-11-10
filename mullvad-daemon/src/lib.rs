@@ -847,13 +847,6 @@ where
         mem::drop(event_listener);
         mem::drop(rpc_runtime);
 
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        if let Err(err) = fs::remove_file(mullvad_paths::get_rpc_socket_path()).await {
-            if err.kind() != std::io::ErrorKind::NotFound {
-                log::error!("Failed to remove old RPC socket: {}", err);
-            }
-        }
-
         if !lock_target_cache {
             let target_cache = cache_dir.join(TARGET_START_STATE_FILE);
             let _ = fs::remove_file(target_cache).await.map_err(|e| {
