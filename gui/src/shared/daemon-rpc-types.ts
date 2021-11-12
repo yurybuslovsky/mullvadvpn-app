@@ -99,7 +99,8 @@ export type DaemonEvent =
   | { settings: ISettings }
   | { relayList: IRelayList }
   | { appVersionInfo: IAppVersionInfo }
-  | { deviceConfig: DeviceConfig };
+  | { deviceConfig: DeviceConfig }
+  | { deviceRemoval: IDevice[] };
 
 export interface ITunnelStateRelayInfo {
   endpoint: ITunnelEndpoint;
