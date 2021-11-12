@@ -98,7 +98,7 @@ export default class AppRenderer {
   private settings!: ISettings;
   private deviceConfig: DeviceConfig;
   private guiSettings!: IGuiSettingsState;
-  private loginState: 'none' | 'logging in' | 'creating account' = 'none';
+  private loginState: 'none' | 'logging in' | 'creating account' | 'too many devices' = 'none';
   private loginScheduler = new Scheduler();
   private connectedToDaemon = false;
   private getLocationPromise?: Promise<ILocation>;
@@ -260,15 +260,21 @@ export default class AppRenderer {
 
     log.info('Logging in');
 
+    const previousLoginState = this.loginState;
     this.loginState = 'logging in';
 
     try {
       await IpcRendererEventChannel.account.login(accountToken);
-      this.redirectToConnect();
+      if (previousLoginState === 'too many devices') {
+        this.resetNavigation();
+      } else {
+        this.redirectToConnect();
+      }
     } catch (e) {
       const error = e as Error;
       if (error.message === 'Too many devices') {
         actions.account.loginTooManyDevices(error);
+        this.loginState = 'too many devices';
         this.history.push(RoutePath.tooManyDevices);
       } else {
         actions.account.loginFailed(error);
@@ -279,6 +285,7 @@ export default class AppRenderer {
   public cancelLogin = (): void => {
     const reduxAccount = this.reduxActions.account;
     reduxAccount.loggedOut();
+    this.loginState = 'none';
   };
 
   public async logout() {
@@ -826,7 +833,9 @@ export default class AppRenderer {
           break;
       }
 
-      this.resetNavigation();
+      if (this.loginState !== 'logging in' && this.loginState !== 'creating account') {
+        this.resetNavigation();
+      }
     }
 
     this.loginState = 'none';
