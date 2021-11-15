@@ -7,6 +7,7 @@ export type LocalizationContexts =
   | 'error-boundary-view'
   | 'connect-container'
   | 'connect-view'
+  | 'device-revoked-view'
   | 'tunnel-control'
   | 'connection-info'
   | 'notifications'
