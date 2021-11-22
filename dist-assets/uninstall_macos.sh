@@ -20,7 +20,7 @@ sudo rm -f "$DAEMON_PLIST_PATH"
 
 echo "Resetting firewall"
 sudo /Applications/Mullvad\ VPN.app/Contents/Resources/mullvad-setup reset-firewall
-sudo /Applications/Mullvad\ VPN.app/Contents/Resources/mullvad-setup remove-wireguard-key
+sudo /Applications/Mullvad\ VPN.app/Contents/Resources/mullvad-setup remove-device
 
 echo "Removing zsh shell completion symlink ..."
 sudo rm -f /usr/local/share/zsh/site-functions/_mullvad
