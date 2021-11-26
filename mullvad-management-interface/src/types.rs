@@ -201,6 +201,7 @@ impl From<mullvad_types::device::Device> for Device {
         Device {
             id: device.id,
             name: device.name,
+            pubkey: device.pubkey.as_bytes().to_vec(),
         }
     }
 }
