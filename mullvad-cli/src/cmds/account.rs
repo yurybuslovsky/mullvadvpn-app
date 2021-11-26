@@ -3,7 +3,7 @@ use clap::value_t_or_exit;
 use itertools::Itertools;
 use mullvad_management_interface::{
     types::{self, Timestamp},
-    Code,
+    Code, ManagementServiceClient,
 };
 use mullvad_types::account::AccountToken;
 use std::io::{self, Write};
@@ -27,8 +27,8 @@ impl Command for Account {
                 clap::SubCommand::with_name("login")
                     .about("Log in to an account")
                     .arg(
-                        clap::Arg::with_name("token")
-                            .help("The Mullvad account token to configure the client with")
+                        clap::Arg::with_name("account")
+                            .help("The Mullvad account number to configure the client with")
                             .required(false),
                     ),
             )
@@ -43,18 +43,20 @@ impl Command for Account {
                 clap::SubCommand::with_name("list-devices")
                     .about("List devices associated with an account")
                     .arg(
-                        clap::Arg::with_name("token")
+                        clap::Arg::with_name("account")
                             .help("Mullvad account number")
-                            .required(true),
+                            .long("account")
+                            .takes_value(true),
                     ),
             )
             .subcommand(
                 clap::SubCommand::with_name("revoke-device")
                     .about("Revoke a device associated with an account")
                     .arg(
-                        clap::Arg::with_name("token")
+                        clap::Arg::with_name("account")
                             .help("Mullvad account number")
-                            .required(true),
+                            .long("account")
+                            .takes_value(true),
                     )
                     .arg(
                         clap::Arg::with_name("device")
@@ -77,16 +79,15 @@ impl Command for Account {
         if let Some(_matches) = matches.subcommand_matches("create") {
             self.create().await
         } else if let Some(set_matches) = matches.subcommand_matches("login") {
-            self.login(parse_token(set_matches)).await
+            self.login(parse_token_else_stdin(set_matches)).await
         } else if let Some(_matches) = matches.subcommand_matches("logout") {
             self.logout().await
         } else if let Some(_matches) = matches.subcommand_matches("get") {
             self.get().await
         } else if let Some(set_matches) = matches.subcommand_matches("list-devices") {
-            self.list_devices(parse_token(set_matches)).await
+            self.list_devices(set_matches).await
         } else if let Some(set_matches) = matches.subcommand_matches("revoke-device") {
-            self.revoke_device(parse_token(set_matches), parse_device_id(set_matches))
-                .await
+            self.revoke_device(set_matches).await
         } else if let Some(matches) = matches.subcommand_matches("redeem") {
             let voucher = value_t_or_exit!(matches.value_of("voucher"), String);
             self.redeem_voucher(voucher).await
@@ -139,8 +140,9 @@ impl Account {
         Ok(())
     }
 
-    async fn list_devices(&self, token: String) -> Result<()> {
+    async fn list_devices(&self, matches: &clap::ArgMatches<'_>) -> Result<()> {
         let mut rpc = new_rpc_client().await?;
+        let token = self.parse_account_else_current(&mut rpc, matches).await?;
         let devices = rpc.list_devices(token).await?.into_inner();
 
         println!("{:?}", devices);
@@ -148,8 +150,12 @@ impl Account {
         Ok(())
     }
 
-    async fn revoke_device(&self, token: String, device_id: String) -> Result<()> {
+    async fn revoke_device(&self, matches: &clap::ArgMatches<'_>) -> Result<()> {
         let mut rpc = new_rpc_client().await?;
+
+        let token = self.parse_account_else_current(&mut rpc, matches).await?;
+        let device_id = parse_device_id(matches);
+
         rpc.remove_device(types::DeviceRemoval {
             account_token: token,
             device_id,
@@ -157,6 +163,29 @@ impl Account {
         .await?;
         println!("Removed device");
         Ok(())
+    }
+
+    async fn parse_account_else_current(
+        &self,
+        rpc: &mut ManagementServiceClient,
+        matches: &clap::ArgMatches<'_>,
+    ) -> Result<String> {
+        match matches.value_of("account").map(str::to_string) {
+            Some(token) => Ok(token),
+            None => {
+                let device = rpc
+                    .get_device(())
+                    .await
+                    .map_err(|error| match error.code() {
+                        mullvad_management_interface::Code::NotFound => {
+                            Error::CommandFailed("Log in or specify an account")
+                        }
+                        _ => Error::RpcFailedExt("Failed to obtain device", error),
+                    })?
+                    .into_inner();
+                Ok(device.account_token)
+            }
+        }
     }
 
     async fn redeem_voucher(&self, mut voucher: String) -> Result<()> {
@@ -208,8 +237,8 @@ impl Account {
     }
 }
 
-fn parse_token(matches: &clap::ArgMatches<'_>) -> String {
-    parse_from_match_else_stdin("Enter account token: ", "token", matches)
+fn parse_token_else_stdin(matches: &clap::ArgMatches<'_>) -> String {
+    parse_from_match_else_stdin("Enter account number: ", "account", matches)
 }
 
 fn parse_device_id(matches: &clap::ArgMatches<'_>) -> String {
