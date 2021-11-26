@@ -18,11 +18,14 @@ import AccountTokenLabel from './AccountTokenLabel';
 import * as AppButton from './AppButton';
 import { AriaDescribed, AriaDescription, AriaDescriptionGroup } from './AriaGroup';
 import { Layout } from './Layout';
-import { ModalContainer } from './Modal';
+import { ModalAlert, ModalAlertType, ModalContainer, ModalMessage } from './Modal';
 import { BackBarItem, NavigationBar, NavigationItems, TitleBarItem } from './NavigationBar';
 import SettingsHeader, { HeaderTitle } from './SettingsHeader';
 
 import { AccountToken } from '../../shared/daemon-rpc-types';
+import { sprintf } from 'sprintf-js';
+import { formatMarkdown } from '../markdown-formatter';
+import { capitalizeEveryWord } from '../../shared/string-helpers';
 
 interface IProps {
   deviceName?: string;
@@ -36,12 +39,20 @@ interface IProps {
   updateAccountData: () => void;
 }
 
-export default class Account extends React.Component<IProps> {
+interface IState {
+  showLogoutConfirmationDialog: boolean;
+}
+
+export default class Account extends React.Component<IProps, IState> {
+  state = { showLogoutConfirmationDialog: false };
+
   public componentDidMount() {
     this.props.updateAccountData();
   }
 
   public render() {
+    const capitalizedDeviceName = capitalizeEveryWord(this.props.deviceName ?? '');
+
     return (
       <ModalContainer>
         <Layout>
@@ -120,16 +131,65 @@ export default class Account extends React.Component<IProps> {
 
                 <StyledRedeemVoucherButton />
 
-                <AppButton.RedButton onClick={this.props.onLogout}>
+                <AppButton.RedButton onClick={this.onShowLogoutConfirmationDialog}>
                   {messages.pgettext('account-view', 'Log out')}
                 </AppButton.RedButton>
               </AccountFooter>
             </AccountContainer>
           </StyledContainer>
         </Layout>
+
+        {this.state.showLogoutConfirmationDialog && (
+          <ModalAlert
+            type={ModalAlertType.warning}
+            buttons={[
+              <AppButton.RedButton key="logout" onClick={this.props.onLogout}>
+                {
+                  // TRANSLATORS: Confirmation button when logging out
+                  messages.pgettext('account-view', 'Yes, log out device')
+                }
+              </AppButton.RedButton>,
+              <AppButton.BlueButton key="back" onClick={this.onHideLogoutConfirmationDialog}>
+                {messages.gettext('Back')}
+              </AppButton.BlueButton>,
+            ]}>
+            <ModalMessage>
+              {formatMarkdown(
+                // TRANSLATORS: This is displayed in a warning message before proceeding to log out.
+                // TRANSLATORS: The text enclosed in "**" will appear bold.
+                // TRANSLATORS: Available placeholders:
+                // TRANSLATORS: %(deviceName)s - The name of the currently logged in device.
+                sprintf(
+                  messages.pgettext(
+                    'account-view',
+                    'Are you sure you want to log out of **%(deviceName)s**?',
+                  ),
+                  { deviceName: capitalizedDeviceName },
+                ),
+              )}
+            </ModalMessage>
+            <ModalMessage>
+              {
+                // TRANSLATORS: This is is a further explanation of what happens when logging out.
+                messages.pgettext(
+                  'account-view',
+                  'This will delete all forwarded ports. Local settings will be saved.',
+                )
+              }
+            </ModalMessage>
+          </ModalAlert>
+        )}
       </ModalContainer>
     );
   }
+
+  private onShowLogoutConfirmationDialog = () => {
+    this.setState({ showLogoutConfirmationDialog: true });
+  };
+
+  private onHideLogoutConfirmationDialog = () => {
+    this.setState({ showLogoutConfirmationDialog: false });
+  };
 }
 
 function FormattedAccountExpiry(props: { expiry?: string; locale: string }) {
