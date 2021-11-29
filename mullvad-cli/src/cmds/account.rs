@@ -66,7 +66,7 @@ impl Command for Account {
                     )
                     .arg(
                         clap::Arg::with_name("device")
-                            .help("ID of the device to revoke")
+                            .help("Name of the device to revoke")
                             .required(true),
                     ),
             )
@@ -173,7 +173,17 @@ impl Account {
         let mut rpc = new_rpc_client().await?;
 
         let token = self.parse_account_else_current(&mut rpc, matches).await?;
-        let device_id = parse_device_id(matches);
+        let device_name = parse_device_name(matches);
+
+        let device_list = rpc.list_devices(token.clone()).await?.into_inner();
+        let mut device_id = None;
+        for device in device_list.devices {
+            if device.name.eq_ignore_ascii_case(&device_name) {
+                device_id = Some(device.id);
+                break;
+            }
+        }
+        let device_id = device_id.ok_or_else(|| Error::CommandFailed("Device not found"))?;
 
         rpc.remove_device(types::DeviceRemoval {
             account_token: token,
@@ -258,10 +268,14 @@ impl Account {
 
 fn parse_token_else_stdin(matches: &clap::ArgMatches<'_>) -> String {
     parse_from_match_else_stdin("Enter account number: ", "account", matches)
+        .split_whitespace()
+        .join("")
 }
 
-fn parse_device_id(matches: &clap::ArgMatches<'_>) -> String {
-    parse_from_match_else_stdin("Enter device id: ", "device", matches)
+fn parse_device_name(matches: &clap::ArgMatches<'_>) -> String {
+    parse_from_match_else_stdin("Enter device name: ", "device", matches)
+        .trim()
+        .to_string()
 }
 
 fn parse_from_match_else_stdin(
@@ -269,7 +283,7 @@ fn parse_from_match_else_stdin(
     key: &'static str,
     matches: &clap::ArgMatches<'_>,
 ) -> String {
-    let val = match matches.value_of(key) {
+    match matches.value_of(key) {
         Some(device) => device.to_string(),
         None => {
             let mut val = String::new();
@@ -282,6 +296,5 @@ fn parse_from_match_else_stdin(
                 .expect("Failed to read from STDIN");
             val
         }
-    };
-    val.split_whitespace().join("").to_string()
+    }
 }
