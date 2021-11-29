@@ -31,7 +31,6 @@ use tokio::{
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
-
 /// How often to check whether the key has expired.
 /// A short interval is used in case the computer is ever suspended.
 const KEY_CHECK_INTERVAL: Duration = Duration::from_secs(60);
@@ -47,7 +46,6 @@ const RETRY_BACKOFF_INTERVAL_FACTOR: u32 = 5;
 const RETRY_BACKOFF_INTERVAL_MAX: Duration = Duration::from_secs(24 * 60 * 60);
 
 pub struct DeviceKeyEvent(pub DeviceData);
-
 
 #[derive(err_derive::Error, Debug)]
 pub enum Error {
@@ -377,7 +375,6 @@ impl Drop for AccountManager {
     }
 }
 
-
 #[derive(Clone)]
 pub struct DeviceService {
     api_availability: ApiAvailabilityHandle,
@@ -590,7 +587,6 @@ impl DeviceService {
         .map_err(map_rest_error)
     }
 }
-
 
 pub struct DeviceCacher {
     file: io::BufWriter<fs::File>,

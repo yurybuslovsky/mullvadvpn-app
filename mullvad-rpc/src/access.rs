@@ -10,7 +10,6 @@ use std::{
 };
 use talpid_types::ErrorExt;
 
-
 #[derive(Clone)]
 pub struct AccessTokenProxy {
     service: RequestServiceHandle,

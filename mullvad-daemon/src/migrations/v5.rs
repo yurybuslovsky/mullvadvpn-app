@@ -6,7 +6,6 @@ use mullvad_types::{
 use talpid_core::mpsc::Sender;
 use talpid_types::ErrorExt;
 
-
 pub(crate) async fn migrate(
     settings: &mut serde_json::Value,
     runtime: tokio::runtime::Handle,
