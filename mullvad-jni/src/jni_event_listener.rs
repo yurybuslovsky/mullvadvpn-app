@@ -1,3 +1,6 @@
+// FIXME
+#![allow(dead_code)]
+
 use jnix::{
     jni::{
         objects::{GlobalRef, JMethodID, JObject, JValue},
@@ -80,8 +83,8 @@ struct JniEventHandler<'env> {
     notify_relay_list_event: JMethodID<'env>,
     notify_settings_event: JMethodID<'env>,
     notify_tunnel_event: JMethodID<'env>,
-    notify_device_event: JMethodID<'env>,
-    notify_remove_device_event: JMethodID<'env>,
+    // notify_device_event: JMethodID<'env>,
+    // notify_remove_device_event: JMethodID<'env>,
     events: mpsc::Receiver<Event>,
 }
 
@@ -150,18 +153,18 @@ impl<'env> JniEventHandler<'env> {
             "notifyTunnelStateEvent",
             "(Lnet/mullvad/mullvadvpn/model/TunnelState;)V",
         )?;
-        let notify_device_event = Self::get_method_id(
-            &env,
-            &class,
-            "notifyDeviceEvent",
-            "(Lnet/mullvad/mullvadvpn/model/DeviceEvent;)V",
-        )?;
-        let notify_remove_device_event = Self::get_method_id(
-            &env,
-            &class,
-            "notifyRemoveDeviceEvent",
-            "(Lnet/mullvad/mullvadvpn/model/RemoveDeviceEvent;)V",
-        )?;
+        // let notify_device_event = Self::get_method_id(
+        //    &env,
+        //    &class,
+        //    "notifyDeviceEvent",
+        //    "(Lnet/mullvad/mullvadvpn/model/DeviceEvent;)V",
+        //)?;
+        // let notify_remove_device_event = Self::get_method_id(
+        //    &env,
+        //    &class,
+        //    "notifyRemoveDeviceEvent",
+        //    "(Lnet/mullvad/mullvadvpn/model/RemoveDeviceEvent;)V",
+        //)?;
 
         Ok(JniEventHandler {
             env,
@@ -170,8 +173,8 @@ impl<'env> JniEventHandler<'env> {
             notify_relay_list_event,
             notify_settings_event,
             notify_tunnel_event,
-            notify_device_event,
-            notify_remove_device_event,
+            // notify_device_event,
+            // notify_remove_device_event,
             events,
         })
     }
@@ -201,6 +204,14 @@ impl<'env> JniEventHandler<'env> {
                 }
             }
         }
+    }
+
+    fn handle_device_event(&self, _device_event: DeviceEvent) {
+        // TODO
+    }
+
+    fn handle_remove_device_event(&self, _remove_event: RemoveDeviceEvent) {
+        // TODO
     }
 
     fn handle_relay_list_event(&self, relay_list: RelayList) {

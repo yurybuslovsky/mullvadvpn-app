@@ -1,3 +1,6 @@
+// FIXME
+#![allow(dead_code)]
+
 use futures::{channel::oneshot, executor::block_on};
 use mullvad_daemon::{device, DaemonCommand, DaemonCommandSender};
 use mullvad_types::{
