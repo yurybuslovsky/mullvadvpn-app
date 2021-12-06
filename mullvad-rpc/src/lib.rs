@@ -52,6 +52,9 @@ pub const PUBKEY_IN_USE: &str = "PUBKEY_IN_USE";
 
 pub const API_IP_CACHE_FILENAME: &str = "api-ip-address.txt";
 
+const ACCOUNTS_URL_PREFIX: &str = "accounts/v1-alpha";
+const APP_URL_PREFIX: &str = "app/v1";
+
 lazy_static::lazy_static! {
     static ref API: ApiEndpoint = ApiEndpoint::get();
 }
@@ -306,7 +309,7 @@ impl AccountsProxy {
             let response = rest::send_request(
                 &factory,
                 service,
-                "accounts/v1-alpha/accounts/me",
+                &format!("{}/accounts/me", ACCOUNTS_URL_PREFIX),
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
@@ -324,7 +327,7 @@ impl AccountsProxy {
         let response = rest::send_request(
             &self.handle.factory,
             service,
-            "accounts/v1-alpha/accounts",
+            &format!("{}/accounts/accounts", ACCOUNTS_URL_PREFIX),
             Method::POST,
             None,
             StatusCode::CREATED,
@@ -356,7 +359,7 @@ impl AccountsProxy {
             let response = rest::send_json_request(
                 &factory,
                 service,
-                "app/v1/submit-voucher",
+                &format!("{}/submit-voucher", APP_URL_PREFIX),
                 Method::POST,
                 &submission,
                 Some(access_token),
@@ -386,7 +389,7 @@ impl AccountsProxy {
             let response = rest::send_request(
                 &factory,
                 service,
-                "app/v1/www-auth-token",
+                &format!("{}/www-auth-token", APP_URL_PREFIX),
                 Method::POST,
                 Some(access_token),
                 StatusCode::OK,
@@ -440,8 +443,7 @@ impl DevicesProxy {
             let response = rest::send_json_request(
                 &factory,
                 service,
-                // TODO: Configurable prefix. Lazy static?
-                "accounts/v1-alpha/devices",
+                &format!("{}/devices", ACCOUNTS_URL_PREFIX),
                 Method::POST,
                 &submission,
                 Some(access_token),
@@ -483,11 +485,7 @@ impl DevicesProxy {
             let response = rest::send_request(
                 &factory,
                 service,
-                &format!(
-                    // TODO: Configurable prefix. Lazy static?
-                    "accounts/v1-alpha/devices/{}",
-                    id,
-                ),
+                &format!("{}/devices/{}", ACCOUNTS_URL_PREFIX, id),
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
@@ -510,8 +508,7 @@ impl DevicesProxy {
             let response = rest::send_request(
                 &factory,
                 service,
-                // TODO: Configurable prefix. Lazy static?
-                "accounts/v1-alpha/devices",
+                &format!("{}/devices", ACCOUNTS_URL_PREFIX),
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
@@ -535,11 +532,7 @@ impl DevicesProxy {
             let response = rest::send_request(
                 &factory,
                 service,
-                &format!(
-                    // TODO: Configurable prefix. Lazy static?
-                    "accounts/v1-alpha/devices/{}",
-                    id,
-                ),
+                &format!("{}/devices/{}", ACCOUNTS_URL_PREFIX, id),
                 Method::DELETE,
                 Some(access_token),
                 StatusCode::NO_CONTENT,
@@ -574,11 +567,7 @@ impl DevicesProxy {
             let response = rest::send_json_request(
                 &factory,
                 service,
-                &format!(
-                    // TODO: Configurable prefix. Lazy static?
-                    "accounts/v1-alpha/devices/{}/pubkey",
-                    id,
-                ),
+                &format!("{}/devices/{}/pubkey", ACCOUNTS_URL_PREFIX, id),
                 Method::PUT,
                 &req_body,
                 Some(access_token),
@@ -637,7 +626,7 @@ impl ProblemReportProxy {
         let request = rest::send_json_request(
             &self.handle.factory,
             service,
-            "app/v1/problem-report",
+            &format!("{}/problem-report", APP_URL_PREFIX),
             Method::POST,
             &report,
             None,
@@ -677,7 +666,7 @@ impl AppVersionProxy {
     ) -> impl Future<Output = Result<AppVersionResponse, rest::Error>> {
         let service = self.handle.service.clone();
 
-        let path = format!("app/v1/releases/{}/{}", platform, app_version);
+        let path = format!("{}/releases/{}/{}", APP_URL_PREFIX, platform, app_version);
         let request = self.handle.factory.request(&path, Method::GET);
 
         async move {
@@ -707,7 +696,7 @@ impl ApiProxy {
         let response = rest::send_request(
             &self.handle.factory,
             service,
-            "app/v1/api-addrs",
+            &format!("{}/api-addrs", APP_URL_PREFIX),
             Method::GET,
             None,
             StatusCode::OK,
