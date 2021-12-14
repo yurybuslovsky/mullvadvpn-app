@@ -354,15 +354,15 @@ impl Firewall {
     ) -> Result<Vec<pfctl::FilterRule>> {
         let mut vec = Vec::with_capacity(allowed_ips.len());
         for ip in allowed_ips.iter() {
-            vec.push(
-                self.create_rule_builder(FilterRuleAction::Pass)
-                    .direction(pfctl::Direction::Out)
-                    .to(*ip)
-                    .quick(true)
-                    .user(Uid::from(super::ROOT_UID))
-                    .keep_state(pfctl::StatePolicy::Keep)
-                    .build()?,
-            );
+            // vec.push(
+            //     self.create_rule_builder(FilterRuleAction::Pass)
+            //         .direction(pfctl::Direction::Out)
+            //         .to(*ip)
+            //         .quick(true)
+            //         .user(Uid::from(super::ROOT_UID))
+            //         .keep_state(pfctl::StatePolicy::Keep)
+            //         .build()?,
+            // );
         }
         Ok(vec)
     }

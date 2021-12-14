@@ -354,11 +354,14 @@ impl FilteringResolver {
         query: LowerQuery,
         tx: oneshot::Sender<Box<dyn LookupObject>>,
     ) -> impl Future<Output = ()> {
+        log::error!("responding with empty response {}", query);
         let empty_response = Box::new(EmptyLookup) as Box<dyn LookupObject>;
-        if !self.should_service_request(&query) {
-            let _ = tx.send(empty_response);
-            return Either::Left(async {});
-        }
+        let _ = tx.send(empty_response);
+        return Either::Left(async {});
+        // if !self.should_service_request(&query) || true {
+        //     let _ = tx.send(empty_response);
+        //     return Either::Left(async {});
+        // }
 
         log::trace!("Looking up {}", query.name());
 
@@ -373,6 +376,11 @@ impl FilteringResolver {
         Either::Right(async move {
             match lookup.await {
                 Ok(result) => {
+                    // let mut record = Record::new();
+
+                    // let lookup = Lookup::new_with_max_ttl(
+                    //                                      );
+
                     let lookup = ForwardLookup(result);
                     let ip_records = lookup
                         .iter()
