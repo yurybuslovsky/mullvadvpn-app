@@ -1,7 +1,6 @@
 use socket2::{Domain, Socket, Type};
 
 use std::{
-    collections::BTreeSet,
     ffi::CString,
     future::Future,
     io,
@@ -16,11 +15,11 @@ use std::{
     net,
     num::NonZeroU32,
     os::unix::io::{FromRawFd, IntoRawFd, RawFd},
+    time::{Duration, Instant},
 };
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::Either,
     SinkExt, StreamExt,
 };
 
@@ -113,7 +112,8 @@ struct FilteringResolver {
     excluded_resolver: ExcludedUpstreamResolver,
     rx: mpsc::Receiver<ResolverMessage>,
     resolver_state: ResolverState,
-    tunnel_tx: TunnelCommandSender,
+    // TODO: remove this field
+    _tunnel_tx: TunnelCommandSender,
     dns_server: Option<(tokio::task::JoinHandle<()>, oneshot::Receiver<()>)>,
     command_sender: Weak<mpsc::Sender<ResolverMessage>>,
     runtime_provider: RuntimeProvider,
@@ -219,7 +219,7 @@ impl FilteringResolver {
             excluded_resolver: resolver,
             resolver_state: ResolverState::Shutdown,
             rx,
-            tunnel_tx,
+            _tunnel_tx: tunnel_tx,
             command_sender: Arc::downgrade(&command_tx),
             dns_server: None,
             runtime_provider,
@@ -237,7 +237,7 @@ impl FilteringResolver {
             match message {
                 Request(query, tx) => {
                     if self.resolver_state.is_running() {
-                        tokio::spawn(self.resolve(query, tx));
+                        self.resolve(query, tx);
                     }
                 }
                 SetResolverState(resolver_state, tx) => {
@@ -349,83 +349,30 @@ impl FilteringResolver {
     }
 
     /// Constructs a lookup future for a given DNS query.
-    fn resolve(
-        &mut self,
-        query: LowerQuery,
-        tx: oneshot::Sender<Box<dyn LookupObject>>,
-    ) -> impl Future<Output = ()> {
-        log::error!("responding with empty response {}", query);
+    fn resolve(&mut self, query: LowerQuery, tx: oneshot::Sender<Box<dyn LookupObject>>) {
         let empty_response = Box::new(EmptyLookup) as Box<dyn LookupObject>;
-        let _ = tx.send(empty_response);
-        return Either::Left(async {});
-        // if !self.should_service_request(&query) || true {
-        //     let _ = tx.send(empty_response);
-        //     return Either::Left(async {});
-        // }
-
-        log::trace!("Looking up {}", query.name());
-
-        let unblock_tx = self.tunnel_tx.clone();
-        let lookup: Box<dyn Future<Output = Result<Lookup, ResolveError>> + Unpin + Send> =
-            Box::new(self.excluded_resolver.lookup(
-                query.name().clone(),
-                query.query_type(),
-                Default::default(),
-            ));
-        let resolver_state = self.resolver_state.clone();
-        Either::Right(async move {
-            match lookup.await {
-                Ok(result) => {
-                    // let mut record = Record::new();
-
-                    // let lookup = Lookup::new_with_max_ttl(
-                    //                                      );
-
-                    let lookup = ForwardLookup(result);
-                    let ip_records = lookup
-                        .iter()
-                        .filter_map(|record| match record.rdata() {
-                            RData::A(ipv4) => Some(IpAddr::from(*ipv4)),
-                            RData::AAAA(ipv6) => Some(IpAddr::from(*ipv6)),
-                            _ => None,
-                        })
-                        .collect::<BTreeSet<_>>();
-
-                    if !ip_records.is_empty() {
-                        if resolver_state.is_running() {
-                            Self::unblock_ips(unblock_tx, ip_records).await;
-                        }
-                    }
-                    if tx.send(Box::new(lookup)).is_err() {
-                        log::error!("Failed to send response to resolver");
-                    }
-                }
-                Err(err) => {
-                    log::trace!("Failed to resolve {}: {}", query, err);
-                    let _ = tx.send(empty_response);
-                }
-            }
-        })
-    }
-
-    /// Unblocks a set of addresses in the firewall by sending a message to the tunnel state
-    /// machine and waiting for completion. Be careful not to call this from the context of
-    /// [FilteringResolver::run] and instead call it in a different task, as otherwise a deadlock
-    /// will occur.
-    async fn unblock_ips(maybe_tx: TunnelCommandSender, addresses: BTreeSet<IpAddr>) {
-        let (done_tx, done_rx) = oneshot::channel();
-        if maybe_tx
-            .upgrade()
-            .and_then(|tx| {
-                tx.unbounded_send(TunnelCommand::AddAllowedIps(addresses, done_tx))
-                    .ok()
-            })
-            .is_some()
-        {
-            let _ = done_rx.await;
-        } else {
-            log::error!("Failed to send IPs to unblocker");
+        if !self.should_service_request(&query) {
+            let _ = tx.send(empty_response);
+            return;
         }
+
+        let return_query = query.original().clone();
+        const TTL_SECONDS: u32 = 3;
+        // The response should contain documentation address.
+        const RESOLVED_ADDR: Ipv4Addr = Ipv4Addr::new(198, 51, 100, 1);
+        let mut return_record = Record::with(
+            return_query.name().clone(),
+            return_query.query_type(),
+            TTL_SECONDS,
+        );
+        return_record.set_rdata(RData::A(RESOLVED_ADDR));
+
+        let lookup = Lookup::new_with_deadline(
+            return_query,
+            Arc::new([return_record]),
+            Instant::now() + Duration::from_secs(3),
+        );
+        let _ = tx.send(Box::new(ForwardLookup(lookup)));
     }
 
     /// Determines whether a query should be responded to given the current state of the resolver
