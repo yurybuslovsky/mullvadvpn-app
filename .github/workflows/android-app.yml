@@ -95,6 +95,35 @@ jobs:
                 ./gradlew --console plain assembleDebug
                 ./gradlew testDebugUnitTest
 
+            - name: Build dummy-signed release
+              env:
+                RUSTFLAGS: --deny warnings
+                NDK_TOOLCHAIN_DIR: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+                AR_x86_64_linux_android: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android-ar
+                CC_x86_64_linux_android: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang
+                ARCHITECTURES: aarch64 x86_64
+              run: |
+                keytool -genkey \
+                 -keystore android/dummy.jks \
+                 -alias release \
+                 -keyalg RSA \
+                 -keysize 4096 \
+                 -validity 10000 \
+                 -noprompt \
+                 -keypass password \
+                 -storepass password \
+                 -dname "CN=dummy"
+                echo "keyAlias = release"       >  android/keystore.properties
+                echo "keyPassword = password"   >> android/keystore.properties
+                echo "storeFile = ../dummy.jks" >> android/keystore.properties
+                echo "storePassword = password" >> android/keystore.properties
+                cd android
+                ./gradlew assembleRelease
+
+            - name: Verify existing release artifact
+              run: |
+                test -f android/app/build/outputs/apk/release/app-release.apk
+
     instrumented-tests:
         name: Instrumented tests
         runs-on: macos-latest
