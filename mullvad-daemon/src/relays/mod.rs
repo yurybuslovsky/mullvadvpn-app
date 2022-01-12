@@ -17,6 +17,7 @@ use parking_lot::Mutex;
 use rand::{self, seq::SliceRandom, Rng};
 use std::{
     io,
+    mem::MaybeUninit,
     net::IpAddr,
     path::Path,
     sync::Arc,
@@ -925,6 +926,38 @@ impl RelaySelectorResult {
             entry_relay: Some(entry),
         }
     }
+}
+
+fn log_stack_size(context: &str) {
+    use std::ptr;
+
+    let mut attr: MaybeUninit<libc::pthread_attr_t> = MaybeUninit::uninit();
+    if unsafe { libc::pthread_attr_init(attr.as_mut_ptr() as *mut _) } != 0 {
+        log::error!("Failed to initialize pthread_attr_init from {}", context);
+        return;
+    }
+
+    let mut stack_ptr = ptr::null_mut();
+    let mut stack_size: usize = 0;
+    let attr_ptr = attr.as_mut_ptr();
+
+    unsafe {
+        if libc::pthread_attr_getstack(
+            attr_ptr,
+            &mut stack_ptr as *mut _ as *mut _ ,
+            &mut stack_size as *mut _ as *mut _ ,
+        ) != 0
+        {
+            log::error!("pthread_attr_getstack failed from {}", context);
+            return;
+        };
+    }
+
+    log::error!(
+        "called from {}: current stack size: {}, ",
+        context,
+        stack_size
+    );
 }
 
 #[cfg(test)]
