@@ -7,9 +7,9 @@ object Dependencies {
     object AndroidX {
         const val appcompat = "androidx.appcompat:appcompat:${Versions.AndroidX.appcompat}"
         const val constraintlayout =
-            "androidx.constraintlayout:constraintlayout:${Versions.AndroidX.constraintlayout}"
+            "androidx.constraintlayout:constraintlayout:${Versions.AndroidX.constraintLayout}"
         const val coordinatorlayout =
-            "androidx.coordinatorlayout:coordinatorlayout:${Versions.AndroidX.coordinatorlayout}"
+            "androidx.coordinatorlayout:coordinatorlayout:${Versions.AndroidX.coordinatorLayout}"
         const val coreKtx = "androidx.core:core-ktx:${Versions.AndroidX.coreKtx}"
         const val fragmentKtx = "androidx.fragment:fragment-ktx:${Versions.AndroidX.fragment}"
         const val fragmentTestning =
