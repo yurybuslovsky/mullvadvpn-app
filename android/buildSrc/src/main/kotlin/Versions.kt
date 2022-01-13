@@ -29,7 +29,7 @@ object Versions {
     }
 
     object Plugin {
-        const val android = "4.1.3"
+        const val android = "4.2.2"
         const val playPublisher = "2.7.5"
         const val kotlin = "1.4.31"
         const val dependencyCheck = "6.5.0.1"

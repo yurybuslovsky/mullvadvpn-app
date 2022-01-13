@@ -101,6 +101,10 @@ android {
         }
     }
 
+    packagingOptions {
+        jniLibs.useLegacyPackaging = true
+    }
+
     playConfigs {
         register("release") {
             isEnabled = true
