@@ -8,17 +8,15 @@ import net.mullvad.mullvadvpn.di.SERVICE_CONNECTION_SCOPE
 import net.mullvad.mullvadvpn.ipc.DispatchingHandler
 import net.mullvad.mullvadvpn.ipc.Event
 import net.mullvad.mullvadvpn.ipc.Request
-import org.koin.core.component.KoinApiExtension
+import org.koin.core.component.KoinScopeComponent
+import org.koin.core.component.get
 import org.koin.core.parameter.parametersOf
 import org.koin.core.qualifier.named
-import org.koin.core.scope.KoinScopeComponent
-import org.koin.core.scope.get
 
 // Container of classes that communicate with the service through an active connection
 //
 // The properties of this class can be used to send events to the service, to listen for events from
 // the service and to get values received from events.
-@OptIn(KoinApiExtension::class)
 class ServiceConnection(
     connection: Messenger,
     onServiceReady: ((ServiceConnection) -> Unit)? = null

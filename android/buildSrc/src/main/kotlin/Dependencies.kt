@@ -28,12 +28,14 @@ object Dependencies {
     }
 
     object Koin {
-        const val core = "io.insert-koin:koin-core:${Versions.koin}"
-        const val coreExt = "io.insert-koin:koin-core-ext:${Versions.koin}"
-        const val androidXFragment = "io.insert-koin:koin-androidx-fragment:${Versions.koin}"
-        const val androidXScope = "io.insert-koin:koin-androidx-scope:${Versions.koin}"
-        const val androidXViewmodel = "io.insert-koin:koin-androidx-viewmodel:${Versions.koin}"
-        const val test = "io.insert-koin:koin-test:${Versions.koin}"
+        const val core = "io.insert-koin:koin-core:${Versions.Koin.core}"
+        const val coreExt = "io.insert-koin:koin-core-ext:${Versions.Koin.ext}"
+        const val androidXFragment =
+            "io.insert-koin:koin-androidx-fragment:${Versions.Koin.androidx}"
+        const val androidXScope = "io.insert-koin:koin-androidx-scope:${Versions.Koin.androidx}"
+        const val androidXViewmodel =
+            "io.insert-koin:koin-androidx-viewmodel:${Versions.Koin.androidx}"
+        const val test = "io.insert-koin:koin-test:${Versions.Koin.core}"
     }
 
     object Kotlin {

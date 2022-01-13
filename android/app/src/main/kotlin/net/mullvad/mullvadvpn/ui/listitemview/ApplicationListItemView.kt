@@ -16,12 +16,10 @@ import kotlinx.coroutines.withContext
 import net.mullvad.mullvadvpn.R
 import net.mullvad.mullvadvpn.applist.ApplicationsIconManager
 import net.mullvad.mullvadvpn.di.APPS_SCOPE
-import org.koin.core.component.KoinApiExtension
-import org.koin.core.scope.KoinScopeComponent
+import org.koin.core.component.KoinScopeComponent
+import org.koin.core.component.inject
 import org.koin.core.scope.Scope
-import org.koin.core.scope.inject
 
-@OptIn(KoinApiExtension::class)
 class ApplicationListItemView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
