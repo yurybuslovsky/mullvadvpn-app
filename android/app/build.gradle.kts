@@ -100,6 +100,18 @@ android {
             }
         }
     }
+
+    playConfigs {
+        register("release") {
+            isEnabled = true
+            serviceAccountCredentials = file("play-api-key.json")
+        }
+    }
+}
+
+play {
+    // Disable by default and only enable for the release build type in the 'playConfigs' block.
+    isEnabled = false
 }
 
 configure<org.owasp.dependencycheck.gradle.extension.DependencyCheckExtension> {
@@ -126,10 +138,6 @@ tasks.register("copyExtraAssets", Copy::class) {
     include("relays.json")
     include("api-ip-address.txt")
     into(extraAssetsDirectory)
-}
-
-play {
-    serviceAccountCredentials = file("play-api-key.json")
 }
 
 dependencies {
