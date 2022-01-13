@@ -4,7 +4,7 @@ object Versions {
     const val junit = "4.13"
     const val jvmTarget = "1.8"
     const val koin = "2.2.2"
-    const val kotlin = "1.4.31"
+    const val kotlin = "1.6.10"
     const val kotlinx = "1.5.1"
     const val mockk = "1.12.0"
 
@@ -31,7 +31,6 @@ object Versions {
     object Plugin {
         const val android = "4.2.2"
         const val playPublisher = "2.7.5"
-        const val kotlin = "1.4.31"
         const val dependencyCheck = "6.5.0.1"
         const val gradleVersions = "0.41.0"
     }

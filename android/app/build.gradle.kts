@@ -131,8 +131,8 @@ tasks.withType<KotlinCompile>().all {
         allWarningsAsErrors = false
 
         kotlinOptions.freeCompilerArgs = listOf(
-            "-Xuse-experimental=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-Xuse-experimental=kotlinx.coroutines.ObsoleteCoroutinesApi"
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=kotlinx.coroutines.ObsoleteCoroutinesApi"
         )
     }
 }
