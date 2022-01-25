@@ -3,6 +3,7 @@ members = [
     "android/translations-converter",
     "mullvad-daemon",
     "mullvad-cli",
+    "mullvad-relays",
     "mullvad-setup",
     "mullvad-problem-report",
     "mullvad-jni",

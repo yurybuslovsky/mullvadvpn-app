@@ -1,6 +1,8 @@
 //! When changing relay selection, please verify if `docs/relay-selector.md` needs to be
 //! updated as well.
 
+#![deny(rust_2018_idioms)]
+
 use chrono::{DateTime, Local};
 use ipnetwork::IpNetwork;
 use mullvad_rpc::{availability::ApiAvailabilityHandle, rest::MullvadRestHandle};
@@ -28,7 +30,7 @@ use talpid_types::{
     ErrorExt,
 };
 
-use crate::relays::updater::RelayListUpdater;
+use crate::updater::RelayListUpdater;
 
 use self::{
     matcher::{RelayMatcher, TunnelMatcher, WireguardMatcher},

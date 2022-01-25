@@ -14,7 +14,6 @@ pub mod logging;
 #[cfg(not(target_os = "android"))]
 pub mod management_interface;
 mod migrations;
-mod relays;
 #[cfg(not(target_os = "android"))]
 pub mod rpc_uniqueness_check;
 pub mod runtime;
@@ -42,6 +41,7 @@ use mullvad_types::{
     version::{AppVersion, AppVersionInfo},
     wireguard::{KeygenEvent, RotationInterval},
 };
+use mullvad_relays::{RelaySelector, RelaySelectorResult};
 use settings::SettingsPersister;
 #[cfg(target_os = "android")]
 use std::os::unix::io::RawFd;
@@ -541,7 +541,7 @@ pub struct Daemon<L: EventListener> {
     rpc_handle: mullvad_rpc::rest::MullvadRestHandle,
     wireguard_key_manager: wireguard::KeyManager,
     version_updater_handle: version_check::VersionUpdaterHandle,
-    relay_selector: relays::RelaySelector,
+    relay_selector: RelaySelector,
     last_generated_relay: Option<Relay>,
     last_generated_bridge_relay: Option<Relay>,
     last_generated_entry_relay: Option<Relay>,
@@ -714,7 +714,7 @@ where
             relay_list_listener.notify_relay_list(relay_list.clone());
         };
 
-        let relay_selector = relays::RelaySelector::new(
+        let relay_selector = RelaySelector::new(
             rpc_handle.clone(),
             on_relay_list_update,
             &resource_dir,
@@ -1061,7 +1061,7 @@ where
                             self.settings.get_wireguard().is_some(),
                         )
                         .ok();
-                    if let Some(relays::RelaySelectorResult {
+                    if let Some(RelaySelectorResult {
                         exit_relay,
                         entry_relay,
                         endpoint,

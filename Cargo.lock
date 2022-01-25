@@ -1328,6 +1328,7 @@ dependencies = [
  "log-panics",
  "mullvad-management-interface",
  "mullvad-paths",
+ "mullvad-relays",
  "mullvad-rpc",
  "mullvad-types",
  "nix 0.22.2",
@@ -1430,6 +1431,27 @@ dependencies = [
  "uuid",
  "winapi 0.3.9",
  "winres",
+]
+
+[[package]]
+name = "mullvad-relays"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "err-derive",
+ "futures",
+ "ipnetwork",
+ "log",
+ "mullvad-rpc",
+ "mullvad-types",
+ "parking_lot",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
+ "talpid-core",
+ "talpid-types",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
