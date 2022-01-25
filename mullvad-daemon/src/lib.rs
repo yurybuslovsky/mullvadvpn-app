@@ -26,6 +26,7 @@ use futures::{
     future::{abortable, AbortHandle, Future},
     StreamExt,
 };
+use mullvad_relays::{RelayListUpdaterHandle, RelaySelector, RelaySelectorResult};
 use mullvad_rpc::availability::ApiAvailabilityHandle;
 use mullvad_types::{
     account::{AccountData, AccountToken, VoucherSubmission},
@@ -41,7 +42,6 @@ use mullvad_types::{
     version::{AppVersion, AppVersionInfo},
     wireguard::{KeygenEvent, RotationInterval},
 };
-use mullvad_relays::{RelaySelector, RelaySelectorResult};
 use settings::SettingsPersister;
 #[cfg(target_os = "android")]
 use std::os::unix::io::RawFd;
@@ -542,6 +542,7 @@ pub struct Daemon<L: EventListener> {
     wireguard_key_manager: wireguard::KeyManager,
     version_updater_handle: version_check::VersionUpdaterHandle,
     relay_selector: RelaySelector,
+    relay_list_updater: RelayListUpdaterHandle,
     last_generated_relay: Option<Relay>,
     last_generated_bridge_relay: Option<Relay>,
     last_generated_entry_relay: Option<Relay>,
@@ -714,12 +715,11 @@ where
             relay_list_listener.notify_relay_list(relay_list.clone());
         };
 
-        let relay_selector = RelaySelector::new(
+        let relay_selector = RelaySelector::new(&resource_dir, &cache_dir);
+        let mut relay_list_updater = relay_selector.updater(
             rpc_handle.clone(),
-            on_relay_list_update,
-            &resource_dir,
-            &cache_dir,
             api_availability.clone(),
+            on_relay_list_update,
         );
 
         let app_version_info = version_check::load_cache(&cache_dir).await;
@@ -750,8 +750,7 @@ where
             api_availability.clone(),
         );
 
-        // Attempt to download a fresh relay list
-        relay_selector.update().await;
+        relay_list_updater.update().await;
 
         let mut daemon = Daemon {
             tunnel_command_tx,
@@ -773,6 +772,7 @@ where
             wireguard_key_manager,
             version_updater_handle,
             relay_selector,
+            relay_list_updater,
             last_generated_relay: None,
             last_generated_bridge_relay: None,
             last_generated_entry_relay: None,
@@ -1614,7 +1614,7 @@ where
     }
 
     async fn on_update_relay_locations(&mut self) {
-        self.relay_selector.update().await;
+        self.relay_list_updater.update().await;
     }
 
     async fn on_set_account(

@@ -20,7 +20,7 @@ use rand::{self, seq::SliceRandom, Rng};
 use std::{
     io,
     net::IpAddr,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{self, SystemTime},
 };
@@ -31,11 +31,9 @@ use talpid_types::{
 };
 
 use crate::updater::RelayListUpdater;
+pub use crate::updater::RelayListUpdaterHandle;
 
-use self::{
-    matcher::{RelayMatcher, TunnelMatcher, WireguardMatcher},
-    updater::RelayListUpdaterHandle,
-};
+use self::matcher::{RelayMatcher, TunnelMatcher, WireguardMatcher};
 
 mod matcher;
 mod updater;
@@ -68,9 +66,6 @@ pub enum Error {
 
     #[error(display = "Failure in serialization of the relay list")]
     Serialize(#[error(source)] serde_json::Error),
-
-    #[error(display = "Downloader already shut down")]
-    DownloaderShutDown,
 }
 
 struct ParsedRelays {
@@ -166,19 +161,12 @@ impl ParsedRelays {
 
 pub struct RelaySelector {
     parsed_relays: Arc<Mutex<ParsedRelays>>,
-    updater: Option<RelayListUpdaterHandle>,
+    cache_path: PathBuf,
 }
 
 impl RelaySelector {
-    /// Returns a new `RelaySelector` backed by relays cached on disk. Use the `update` method
-    /// to refresh the relay list from the internet.
-    pub fn new(
-        rpc_handle: MullvadRestHandle,
-        on_update: impl Fn(&RelayList) + Send + 'static,
-        resource_dir: &Path,
-        cache_dir: &Path,
-        api_availability: ApiAvailabilityHandle,
-    ) -> Self {
+    /// Returns a new `RelaySelector` backed by relays cached on disk.
+    pub fn new(resource_dir: &Path, cache_dir: &Path) -> Self {
         let cache_path = cache_dir.join(RELAYS_FILENAME);
         let resource_path = resource_dir.join(RELAYS_FILENAME);
         let unsynchronized_parsed_relays = Self::read_relays_from_disk(&cache_path, &resource_path)
@@ -197,25 +185,28 @@ impl RelaySelector {
         );
         let parsed_relays = Arc::new(Mutex::new(unsynchronized_parsed_relays));
 
-        let updater = RelayListUpdater::new(
-            rpc_handle,
-            cache_path,
-            parsed_relays.clone(),
-            Box::new(on_update),
-            api_availability,
-        );
-
         RelaySelector {
             parsed_relays,
-            updater: Some(updater),
+            cache_path,
         }
     }
 
-    /// Download the newest relay list.
-    pub async fn update(&self) {
-        if let Some(mut updater) = self.updater.clone() {
-            let _ = updater.update_relay_list().await;
-        }
+    /// Creates a new relay list updater. When the relay list is updated,
+    /// `on_update` is called with the updated list, and changes are
+    /// reflected in this `RelaySelector` instance.
+    pub fn updater(
+        &self,
+        rpc_handle: MullvadRestHandle,
+        api_availability: ApiAvailabilityHandle,
+        on_update: impl Fn(&RelayList) + Send + 'static,
+    ) -> RelayListUpdaterHandle {
+        RelayListUpdater::new(
+            rpc_handle,
+            self.cache_path.clone(),
+            self.parsed_relays.clone(),
+            Box::new(on_update),
+            api_availability,
+        )
     }
 
     /// Returns all countries and cities. The cities in the object returned does not have any

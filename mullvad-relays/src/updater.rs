@@ -32,11 +32,10 @@ pub struct RelayListUpdaterHandle {
 }
 
 impl RelayListUpdaterHandle {
-    pub async fn update_relay_list(&mut self) -> Result<(), Error> {
-        self.tx
-            .send(())
-            .await
-            .map_err(|_| Error::DownloaderShutDown)
+    pub async fn update(&mut self) {
+        if let Err(_error) = self.tx.send(()).await {
+            log::error!("Attempted to update the relay list after the updater had been shut down");
+        }
     }
 }
 
