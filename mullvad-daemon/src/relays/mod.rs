@@ -1174,7 +1174,7 @@ mod test {
 
         assert_eq!(exit_relay.hostname, specific_hostname);
 
-        let endpoint = unwrap_enum(endpoint, MullvadEndpoint::Wireguard);
+        let endpoint = unwrap_enum!(endpoint, MullvadEndpoint::Wireguard);
         assert_eq!(
             exit_relay.ipv4_addr_in,
             endpoint.exit_peer.unwrap().endpoint.ip()
