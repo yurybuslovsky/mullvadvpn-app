@@ -535,7 +535,8 @@ impl RelaySelector {
                 relay_constraints.wireguard_constraints =
                     original_constraints.wireguard_constraints.clone();
                 if relay_constraints.wireguard_constraints.port.is_any() {
-                    relay_constraints.wireguard_constraints.port = Self::preferred_wireguard_port(retry_attempt);
+                    relay_constraints.wireguard_constraints.port =
+                        Self::preferred_wireguard_port(retry_attempt);
                 }
             }
         };

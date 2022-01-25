@@ -135,7 +135,9 @@ impl TunnelMatcher for AnyTunnelMatcher {
                 }
             }
             Constraint::Only(TunnelType::OpenVpn) => self.openvpn.filter_matching_endpoints(relay),
-            Constraint::Only(TunnelType::Wireguard) => self.wireguard.filter_matching_endpoints(relay),
+            Constraint::Only(TunnelType::Wireguard) => {
+                self.wireguard.filter_matching_endpoints(relay)
+            }
         }
     }
 
