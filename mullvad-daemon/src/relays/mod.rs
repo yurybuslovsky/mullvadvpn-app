@@ -22,6 +22,7 @@ use std::{
     sync::Arc,
     time::{self, SystemTime},
 };
+use talpid_core::unwrap_enum;
 use talpid_types::{
     net::{openvpn::ProxySettings, wireguard, IpVersion, TransportProtocol, TunnelType},
     ErrorExt,
@@ -345,9 +346,7 @@ impl RelaySelector {
             };
 
         Self::set_entry_peers(
-            exit_endpoint
-                .get_peer_config()
-                .expect("Failed to get peer config from WireGuard endpoint"),
+            &unwrap_enum!(&exit_endpoint, MullvadEndpoint::Wireguard).peer,
             &mut entry_endpoint,
         );
 
@@ -578,15 +577,9 @@ impl RelaySelector {
             .map(|relay| relay.clone())
             .ok_or(Error::NoRelay)?;
         let endpoint = matcher.mullvad_endpoint(&relay).ok_or(Error::NoRelay)?;
-        match endpoint {
-            MullvadEndpoint::Wireguard(endpoint) => Ok((relay, endpoint)),
-            _ => {
-                unreachable!(
-                    "Entry endpoints should only ever be WireGuard endpoints, instead got a {:?}",
-                    endpoint
-                );
-            }
-        }
+        let endpoint = unwrap_enum!(endpoint, MullvadEndpoint::Wireguard);
+
+        Ok((relay, endpoint))
     }
 
     fn set_entry_peers(
@@ -1183,16 +1176,13 @@ mod test {
             .map_err(|error| error.to_string())?;
 
         assert_eq!(exit_relay.hostname, specific_hostname);
-        match endpoint {
-            MullvadEndpoint::OpenVpn { .. } => return Err("Expected WireGuard relay".to_string()),
-            MullvadEndpoint::Wireguard(endpoint) => {
-                assert_eq!(
-                    exit_relay.ipv4_addr_in,
-                    endpoint.exit_peer.unwrap().endpoint.ip()
-                );
-                assert_ne!(exit_relay.ipv4_addr_in, endpoint.peer.endpoint.ip());
-            }
-        }
+
+        let endpoint = unwrap_enum(endpoint, MullvadEndpoint::Wireguard);
+        assert_eq!(
+            exit_relay.ipv4_addr_in,
+            endpoint.exit_peer.unwrap().endpoint.ip()
+        );
+        assert_ne!(exit_relay.ipv4_addr_in, endpoint.peer.endpoint.ip());
 
         Ok(())
     }

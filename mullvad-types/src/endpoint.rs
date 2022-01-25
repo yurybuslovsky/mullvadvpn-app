@@ -35,13 +35,6 @@ impl MullvadEndpoint {
             ),
         }
     }
-
-    pub fn get_peer_config(&self) -> Option<&wireguard::PeerConfig> {
-        match self {
-            Self::Wireguard(wireguard_endpoint) => Some(&wireguard_endpoint.peer),
-            _ => None,
-        }
-    }
 }
 /// TunnelEndpointData contains data required to connect to a given tunnel endpoint.
 /// Different endpoint types can require different types of data.
