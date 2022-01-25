@@ -534,15 +534,8 @@ impl RelaySelector {
             Constraint::Only(TunnelType::Wireguard) => {
                 relay_constraints.wireguard_constraints =
                     original_constraints.wireguard_constraints.clone();
-                // This ensures that if after the first 2 failed attempts the daemon does not
-                // connect, then afterwards 2 of each 4 successive attempts will try to connect
-                // on port 53.
-                if retry_attempt % 4 > 1 && relay_constraints.wireguard_constraints.port.is_any() {
-                    relay_constraints.wireguard_constraints.port =
-                        Constraint::Only(TransportPort {
-                            protocol: TransportProtocol::Udp,
-                            port: Constraint::Only(53),
-                        });
+                if relay_constraints.wireguard_constraints.port.is_any() {
+                    relay_constraints.wireguard_constraints.port = Self::preferred_wireguard_port(retry_attempt);
                 }
             }
         };
@@ -707,6 +700,9 @@ impl RelaySelector {
     }
 
     fn preferred_wireguard_port(retry_attempt: u32) -> Constraint<TransportPort> {
+        // This ensures that if after the first 2 failed attempts the daemon does not
+        // connect, then afterwards 2 of each 4 successive attempts will try to connect
+        // on port 53.
         let port = match retry_attempt % 4 {
             0 | 1 => Constraint::Any,
             _ => Constraint::Only(53),
