@@ -570,7 +570,7 @@ impl RelaySelector {
             .relays()
             .iter()
             .filter(|relay| relay.active)
-            .filter_map(|relay| matcher.matching_relay(relay))
+            .filter_map(|relay| matcher.filter_matching_relay(relay))
             .collect();
 
         let relay = self
@@ -752,7 +752,7 @@ impl RelaySelector {
             .relays()
             .iter()
             .filter(|relay| relay.active)
-            .filter_map(|relay| matcher.matching_relay(relay))
+            .filter_map(|relay| matcher.filter_matching_relay(relay))
             .collect();
 
         self.pick_random_relay(&matching_relays)

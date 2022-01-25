@@ -48,12 +48,14 @@ impl RelayMatcher<WireguardMatcher> {
 }
 
 impl<T: TunnelMatcher> RelayMatcher<T> {
-    pub fn matching_relay(&self, relay: &Relay) -> Option<Relay> {
+    /// Filter a relay and its endpoints based on constraints.
+    /// Only matching endpoints are included in the returned Relay.
+    pub fn filter_matching_relay(&self, relay: &Relay) -> Option<Relay> {
         if !self.location.matches(relay) || !self.providers.matches(relay) {
             return None;
         }
 
-        self.tunnel.matching_relay(relay)
+        self.tunnel.filter_matching_endpoints(relay)
     }
 
     pub fn mullvad_endpoint(&self, relay: &Relay) -> Option<MullvadEndpoint> {
@@ -65,15 +67,16 @@ impl<T: TunnelMatcher> RelayMatcher<T> {
 /// as to not have false dependencies on OpenVpn specific constraints when
 /// selecting only WireGuard tunnels.
 pub trait TunnelMatcher: Clone {
-    /// Check if given relay matches tunnel-specific constraints.
-    fn matching_relay(&self, relay: &Relay) -> Option<Relay>;
+    /// Filter a relay and its endpoints based on constraints.
+    /// Only matching endpoints are included in the returned Relay.
+    fn filter_matching_endpoints(&self, relay: &Relay) -> Option<Relay>;
     /// Constructs a MullvadEndpoint for a given Relay using extra data from the relay matcher
     /// itself.
     fn mullvad_endpoint(&self, relay: &Relay) -> Option<MullvadEndpoint>;
 }
 
 impl TunnelMatcher for OpenVpnMatcher {
-    fn matching_relay(&self, relay: &Relay) -> Option<Relay> {
+    fn filter_matching_endpoints(&self, relay: &Relay) -> Option<Relay> {
         let tunnels = relay
             .tunnels
             .openvpn
@@ -116,11 +119,11 @@ pub struct AnyTunnelMatcher {
 }
 
 impl TunnelMatcher for AnyTunnelMatcher {
-    fn matching_relay(&self, relay: &Relay) -> Option<Relay> {
+    fn filter_matching_endpoints(&self, relay: &Relay) -> Option<Relay> {
         match self.tunnel_type {
             Constraint::Any => {
-                let wireguard_relay = self.wireguard.matching_relay(relay);
-                let openvpn_relay = self.openvpn.matching_relay(relay);
+                let wireguard_relay = self.wireguard.filter_matching_endpoints(relay);
+                let openvpn_relay = self.openvpn.filter_matching_endpoints(relay);
 
                 match (wireguard_relay, openvpn_relay) {
                     (Some(mut matched_relay), Some(openvpn_relay)) => {
@@ -131,8 +134,8 @@ impl TunnelMatcher for AnyTunnelMatcher {
                     _ => None,
                 }
             }
-            Constraint::Only(TunnelType::OpenVpn) => self.openvpn.matching_relay(relay),
-            Constraint::Only(TunnelType::Wireguard) => self.wireguard.matching_relay(relay),
+            Constraint::Only(TunnelType::OpenVpn) => self.openvpn.filter_matching_endpoints(relay),
+            Constraint::Only(TunnelType::Wireguard) => self.wireguard.filter_matching_endpoints(relay),
         }
     }
 
@@ -267,7 +270,7 @@ impl Match<WireguardEndpointData> for WireguardMatcher {
 }
 
 impl TunnelMatcher for WireguardMatcher {
-    fn matching_relay(&self, relay: &Relay) -> Option<Relay> {
+    fn filter_matching_endpoints(&self, relay: &Relay) -> Option<Relay> {
         if self
             .peer
             .as_ref()
