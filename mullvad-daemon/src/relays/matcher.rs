@@ -72,7 +72,7 @@ pub trait TunnelMatcher: Clone {
     fn mullvad_endpoint(&self, relay: &Relay) -> Option<MullvadEndpoint>;
 }
 
-impl TunnelMatcher for OpenVpnConstraints {
+impl TunnelMatcher for OpenVpnMatcher {
     fn matching_relay(&self, relay: &Relay) -> Option<Relay> {
         let tunnels = relay
             .tunnels
@@ -102,10 +102,12 @@ impl TunnelMatcher for OpenVpnConstraints {
     }
 }
 
+pub type OpenVpnMatcher = OpenVpnConstraints;
+
 #[derive(Clone)]
 pub struct AnyTunnelMatcher {
     wireguard: WireguardMatcher,
-    openvpn: OpenVpnConstraints,
+    openvpn: OpenVpnMatcher,
     /// in the case that a user hasn't specified a tunnel protocol, the relay
     /// selector might still construct preferred constraints that do select a
     /// specific tunnel protocol, which is why the tunnel type may be specified
