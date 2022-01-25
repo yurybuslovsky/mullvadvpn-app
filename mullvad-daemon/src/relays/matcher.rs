@@ -162,6 +162,8 @@ impl TunnelMatcher for AnyTunnelMatcher {
 
 #[derive(Clone)]
 pub struct WireguardMatcher {
+    /// The peer is an already selected peer relay to be used with multihop.
+    /// It's stored here so we can exclude it from further selections being made.
     pub peer: Option<Relay>,
     pub port: Constraint<TransportPort>,
     pub ip_version: Constraint<IpVersion>,
