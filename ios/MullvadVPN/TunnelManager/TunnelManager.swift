@@ -102,11 +102,11 @@ class TunnelManager: TunnelManagerStateDelegate
     private func updatePrivateKeyRotationTimer() {
         dispatchPrecondition(condition: .onQueue(stateQueue))
 
-        guard self.isRunningPeriodicPrivateKeyRotation else { return }
+        guard isRunningPeriodicPrivateKeyRotation else { return }
 
         if let tunnelInfo = self.state.tunnelInfo {
             let creationDate = tunnelInfo.tunnelSettings.interface.privateKey.creationDate
-            let scheduleDate = Date(timeInterval: Self.privateKeyRotationInterval, since: creationDate)
+            let scheduleDate = nextScheduleDate(previousDate: creationDate)
 
             schedulePrivateKeyRotationTimer(scheduleDate)
         } else {
@@ -638,9 +638,9 @@ extension TunnelManager {
 
     /// Schedule background task relative to the private key creation date.
     func scheduleBackgroundTask() -> Result<(), TunnelManager.Error> {
-        if let tunnelInfo = self.state.tunnelInfo {
+        if let tunnelInfo = state.tunnelInfo {
             let creationDate = tunnelInfo.tunnelSettings.interface.privateKey.creationDate
-            let beginDate = Date(timeInterval: Self.privateKeyRotationInterval, since: creationDate)
+            let beginDate = nextScheduleDate(previousDate: creationDate)
 
             return submitBackgroundTask(at: beginDate)
         } else {
@@ -698,11 +698,14 @@ extension TunnelManager {
             switch result {
             case .finished:
                 logger.debug("Finished private key rotation")
-            case .throttled:
-                logger.debug("Private key was already rotated earlier")
-            }
 
-            return nextScheduleDate(result)
+                return nextScheduleDate(previousDate: Date())
+
+            case .throttled(let lastKeyCreationDate):
+                logger.debug("Private key was already rotated earlier")
+
+                return nextScheduleDate(previousDate: lastKeyCreationDate)
+            }
         } else {
             logger.debug("Private key rotation was cancelled")
 
@@ -710,14 +713,10 @@ extension TunnelManager {
         }
     }
 
-    fileprivate func nextScheduleDate(_ result: KeyRotationResult) -> Date {
-        switch result {
-        case .finished:
-            return Date(timeIntervalSinceNow: Self.privateKeyRotationInterval)
+    fileprivate func nextScheduleDate(previousDate: Date) -> Date {
+        let scheduleDate = previousDate.addingTimeInterval(Self.privateKeyRotationInterval)
 
-        case .throttled(let lastKeyCreationDate):
-            return Date(timeInterval: Self.privateKeyRotationInterval, since: lastKeyCreationDate)
-        }
+        return max(scheduleDate, Date())
     }
 
     fileprivate func nextRetryScheduleDate(_ error: TunnelManager.Error) -> Date? {

@@ -137,13 +137,17 @@ extension AddressCache {
         }
 
         private func nextScheduleDate() -> Date {
+            let scheduleDate: Date
+
             if let lastFailureAttemptDate = lastFailureAttemptDate {
-                return Date(timeInterval: Self.retryInterval, since: lastFailureAttemptDate)
+                scheduleDate = Date(timeInterval: Self.retryInterval, since: lastFailureAttemptDate)
             } else {
                 let updatedAt = store.getLastUpdateDateAndWait()
 
-                return Date(timeInterval: Self.updateInterval, since: updatedAt)
+                scheduleDate = Date(timeInterval: Self.updateInterval, since: updatedAt)
             }
+
+            return max(scheduleDate, Date())
         }
 
         private func handleCacheUpdateResult(_ result: AddressCache.CacheUpdateResult) {
