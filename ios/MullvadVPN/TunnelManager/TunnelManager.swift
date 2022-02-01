@@ -73,6 +73,7 @@ class TunnelManager: TunnelManagerStateDelegate
 
     private var privateKeyRotationTimer: DispatchSourceTimer?
     private var isRunningPeriodicPrivateKeyRotation = false
+    private var lastKeyRotationFailureAttemptDate: Date?
 
     func startPeriodicPrivateKeyRotation() {
         stateQueue.async {
@@ -106,7 +107,13 @@ class TunnelManager: TunnelManagerStateDelegate
 
         if let tunnelInfo = self.state.tunnelInfo {
             let creationDate = tunnelInfo.tunnelSettings.interface.privateKey.creationDate
-            let scheduleDate = nextScheduleDate(previousDate: creationDate)
+            let scheduleDate: Date
+
+            if let lastKeyRotationFailureAttemptDate = lastKeyRotationFailureAttemptDate {
+                scheduleDate = nextRetryScheduleDate(lastKeyRotationFailureAttemptDate)
+            } else {
+                scheduleDate = nextScheduleDate(previousDate: creationDate)
+            }
 
             schedulePrivateKeyRotationTimer(scheduleDate)
         } else {
@@ -693,8 +700,18 @@ extension TunnelManager {
         if let error = error {
             logger.error(chainedError: error, message: "Failed to rotate private key")
 
-            return nextRetryScheduleDate(error)
+            if shouldRetry(error) {
+                lastKeyRotationFailureAttemptDate = Date()
+
+                return nextRetryScheduleDate(Date())
+            } else {
+                lastKeyRotationFailureAttemptDate = nil
+
+                return nil
+            }
         } else if let result = result {
+            lastKeyRotationFailureAttemptDate = nil
+
             switch result {
             case .finished:
                 logger.debug("Finished private key rotation")
@@ -709,7 +726,9 @@ extension TunnelManager {
         } else {
             logger.debug("Private key rotation was cancelled")
 
-            return Date(timeIntervalSinceNow: Self.privateKeyRotationFailureRetryInterval)
+            lastKeyRotationFailureAttemptDate = Date()
+
+            return nextRetryScheduleDate(Date())
         }
     }
 
@@ -719,18 +738,24 @@ extension TunnelManager {
         return max(scheduleDate, Date())
     }
 
-    fileprivate func nextRetryScheduleDate(_ error: TunnelManager.Error) -> Date? {
+    fileprivate func shouldRetry(_ error: TunnelManager.Error) -> Bool {
         switch error {
         case .unsetAccount:
             // Do not retry if logged out.
-            return nil
+            return false
 
         case .replaceWireguardKey(.server(.invalidAccount)):
             // Do not retry if account was removed.
-            return nil
+            return false
 
         default:
-            return Date(timeIntervalSinceNow: Self.privateKeyRotationFailureRetryInterval)
+            return true
         }
+    }
+
+    fileprivate func nextRetryScheduleDate(_ lastFailureDate: Date) -> Date {
+        let scheduleDate = lastFailureDate.addingTimeInterval(Self.privateKeyRotationFailureRetryInterval)
+
+        return max(scheduleDate, Date())
     }
 }
