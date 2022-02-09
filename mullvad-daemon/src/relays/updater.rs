@@ -19,9 +19,9 @@ use tokio::fs::File;
 /// How often the updater should wake up to check the cache of the in-memory cache of relays.
 /// This check is very cheap. The only reason to not have it very often is because if downloading
 /// constantly fails it will try very often and fill the logs etc.
-const UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 15);
+const UPDATE_CHECK_INTERVAL: Duration = Duration::from_millis(1);
 /// How old the cached relays need to be to trigger an update
-const UPDATE_INTERVAL: Duration = Duration::from_secs(60 * 60);
+const UPDATE_INTERVAL: Duration = Duration::from_millis(10);
 
 const EXPONENTIAL_BACKOFF_INITIAL: Duration = Duration::from_secs(16);
 const EXPONENTIAL_BACKOFF_FACTOR: u32 = 8;
@@ -75,16 +75,14 @@ impl RelayListUpdater {
     }
 
     async fn run(mut self, mut cmd_rx: mpsc::Receiver<()>) {
-        let mut check_interval =
-            tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(
-                (Instant::now() + UPDATE_CHECK_INTERVAL).into(),
-                UPDATE_CHECK_INTERVAL,
-            ))
-            .fuse();
+        let mut check_interval = tokio::time::interval_at(
+            (Instant::now() + UPDATE_CHECK_INTERVAL).into(),
+            UPDATE_CHECK_INTERVAL,
+        );
         let mut download_future = Box::pin(Fuse::terminated());
         loop {
             futures::select! {
-                _check_update = check_interval.next() => {
+                _check_update = check_interval.tick().fuse() => {
                     if download_future.is_terminated() && self.should_update() {
                         let tag = self.parsed_relays.lock().tag().map(|tag| tag.to_string());
                         download_future = Box::pin(Self::download_relay_list(self.api_availability.clone(), self.rpc_client.clone(), tag).fuse());
