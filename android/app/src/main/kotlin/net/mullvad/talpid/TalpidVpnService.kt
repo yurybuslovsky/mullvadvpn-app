@@ -9,6 +9,8 @@ import java.net.InetAddress
 import kotlin.properties.Delegates.observable
 import net.mullvad.talpid.tun_provider.TunConfig
 
+private const val MAX_TUN_USES = 20
+
 open class TalpidVpnService : VpnService() {
     private var activeTunStatus by observable<CreateTunResult?>(null) { _, oldTunStatus, _ ->
         val oldTunFd = when (oldTunStatus) {
@@ -27,6 +29,7 @@ open class TalpidVpnService : VpnService() {
 
     private var currentTunConfig = defaultTunConfig()
     private var tunIsStale = false
+    private var tunUseCount = 0
 
     protected var disallowedApps: List<String>? = null
 
@@ -44,17 +47,25 @@ open class TalpidVpnService : VpnService() {
         synchronized(this) {
             val tunStatus = activeTunStatus
 
-            if (config == currentTunConfig && tunIsOpen && !tunIsStale) {
-                return tunStatus!!
-            } else {
-                val newTunStatus = createTun(config)
+            if (config == currentTunConfig && tunIsOpen) {
+                tunUseCount += 1
+                if (tunUseCount >= MAX_TUN_USES) {
+                    tunIsStale = true
+                }
 
-                currentTunConfig = config
-                activeTunStatus = newTunStatus
-                tunIsStale = false
-
-                return newTunStatus
+                if (!tunIsStale) {
+                    return tunStatus!!
+                }
             }
+
+            val newTunStatus = createTun(config)
+
+            currentTunConfig = config
+            activeTunStatus = newTunStatus
+            tunIsStale = false
+            tunUseCount = 0
+
+            return newTunStatus
         }
     }
 
