@@ -7,7 +7,6 @@ use jnix::{
     jni::{
         objects::{GlobalRef, JValue},
         signature::{JavaType, Primitive},
-        sys::JNI_FALSE,
         JavaVM,
     },
     FromJava, IntoJava, JnixEnv,
@@ -138,47 +137,6 @@ impl AndroidTunProvider {
         self.prepare_tun_config(&mut config);
         let _ = self.get_tun(config)?;
         Ok(())
-    }
-
-    /// Open a tunnel device using the previous or the default configuration.
-    ///
-    /// Will open a new tunnel if there is already an active tunnel. The previous tunnel will be
-    /// closed.
-    pub fn create_tun(&mut self) -> Result<(), Error> {
-        let result = self.call_method(
-            "createTun",
-            "()V",
-            JavaType::Primitive(Primitive::Void),
-            &[],
-        )?;
-
-        match result {
-            JValue::Void => Ok(()),
-            value => Err(Error::InvalidMethodResult(
-                "createTun",
-                format!("{:?}", value),
-            )),
-        }
-    }
-
-    /// Open a tunnel device using the previous or the default configuration if there is no
-    /// currently active tunnel.
-    pub fn create_tun_if_closed(&mut self) -> Result<(), Error> {
-        let result = self.call_method(
-            "createTunIfClosed",
-            "()Z",
-            JavaType::Primitive(Primitive::Boolean),
-            &[],
-        )?;
-
-        match result {
-            JValue::Bool(JNI_FALSE) => Err(Error::TunnelDeviceError),
-            JValue::Bool(_) => Ok(()),
-            value => Err(Error::InvalidMethodResult(
-                "createTunIfClosed",
-                format!("{:?}", value),
-            )),
-        }
     }
 
     /// Close currently active tunnel device.
