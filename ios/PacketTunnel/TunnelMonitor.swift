@@ -12,7 +12,8 @@ import WireGuardKit
 import Logging
 
 protocol TunnelMonitorDelegate: AnyObject {
-    func tunnelMonitor(_ tunnelMonitor: TunnelMonitor, connectionStatusDidChange status: TunnelMonitor.ConnectionStatus)
+    func tunnelMonitorDidDetermineConnectionEstablished(_ tunnelMonitor: TunnelMonitor)
+    func tunnelMonitorDelegateShouldHandleConnectionRecovery(_ tunnelMonitor: TunnelMonitor)
 }
 
 class TunnelMonitor {
@@ -28,23 +29,13 @@ class TunnelMonitor {
     /// Interval after which connection is treated as being lost.
     static let connectionTimeout: TimeInterval = 15
 
-    /// Tunnel connection status.
-    enum ConnectionStatus {
-        /// Connection established.
-        case established
-
-        /// Connection lost.
-        case lost
-    }
-
-    private let stateLock = NSLock()
+    private let stateLock = NSRecursiveLock()
     private let adapter: WireGuardAdapter
     private let queue: DispatchQueue
 
     private var pinger: Pinger?
     private var networkBytesReceived: UInt64 = 0
-    private var startDate: Date?
-    private var connectionStatus: ConnectionStatus?
+    private var lastAttemptDate = Date()
 
     private var logger = Logger(label: "TunnelMonitor")
     private var timer: DispatchSourceTimer?
@@ -80,8 +71,7 @@ class TunnelMonitor {
         timer?.cancel()
 
         networkBytesReceived = 0
-        connectionStatus = nil
-        startDate = Date()
+        lastAttemptDate = Date()
 
         pinger = Pinger(address: address, interfaceName: adapter.interfaceName)
         try pinger?.start(delay: Self.pingStartDelay, repeating: Self.pingInterval)
@@ -102,8 +92,6 @@ class TunnelMonitor {
 
         timer?.cancel()
         timer = nil
-
-        startDate = nil
 
         stateLock.unlock()
     }
@@ -127,49 +115,32 @@ class TunnelMonitor {
 
         stateLock.lock()
         defer { stateLock.unlock() }
+        
         let oldNetworkBytesReceived = self.networkBytesReceived
         networkBytesReceived = newNetworkBytesReceived
 
-        if newNetworkBytesReceived != oldNetworkBytesReceived {
-            self.logger.debug("Got newNetworkBytesReceived = \(newNetworkBytesReceived), oldNetworkBytesReceived = \(oldNetworkBytesReceived)")
+        if newNetworkBytesReceived < oldNetworkBytesReceived {
+            self.logger.debug("Stats was reset? newNetworkBytesReceived = \(newNetworkBytesReceived), oldNetworkBytesReceived = \(oldNetworkBytesReceived)")
+            return
         }
 
-        switch self.connectionStatus {
-        case .none:
-            if newNetworkBytesReceived > oldNetworkBytesReceived {
-                let newConnectionStatus = ConnectionStatus.established
-
-                connectionStatus = newConnectionStatus
-                logger.debug("Connection established.")
-
-                queue.async {
-                    self.delegate?.tunnelMonitor(self, connectionStatusDidChange: newConnectionStatus)
-                }
-            } else if let startDate = self.startDate, Date().timeIntervalSince(startDate) >= Self.connectionTimeout {
-                let newConnectionStatus = ConnectionStatus.lost
-
-                connectionStatus = newConnectionStatus
-                logger.debug("Connection lost.")
-
-                self.queue.async {
-                    self.delegate?.tunnelMonitor(self, connectionStatusDidChange: newConnectionStatus)
-                }
+        if newNetworkBytesReceived > oldNetworkBytesReceived {
+            // Tell delegate that connection is established.
+            queue.async {
+                self.delegate?.tunnelMonitorDidDetermineConnectionEstablished(self)
             }
 
-        case .established:
-            break
-
-        case .lost:
-            if newNetworkBytesReceived > oldNetworkBytesReceived {
-                let newConnectionStatus = ConnectionStatus.established
-
-                connectionStatus = newConnectionStatus
-                logger.debug("Connection changed from lost to established.")
-
-                queue.async {
-                    self.delegate?.tunnelMonitor(self, connectionStatusDidChange: newConnectionStatus)
-                }
+            // Stop the tunnel monitor.
+            stop()
+        } else if Date().timeIntervalSince(lastAttemptDate) >= Self.connectionTimeout {
+            // Tell delegate to attempt the connection recovery.
+            self.queue.async {
+                self.delegate?.tunnelMonitorDelegateShouldHandleConnectionRecovery(self)
             }
+
+            // Reset the last recovery attempt date so that we periodically notify the delegate
+            // to perform the recovery.
+            lastAttemptDate = Date()
         }
     }
 

@@ -87,7 +87,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
             )
         }
 
-        // Read tunnel confguration.
+        // Read tunnel configuration.
         let tunnelConfiguration: PacketTunnelConfiguration
         switch makeConfiguration(appSelectorResult) {
         case .success(let configuration):
@@ -130,14 +130,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
                 // Start tunnel monitor.
                 let probeAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
-                self.providerLogger.debug("Starting tunnel monitor with address: \(probeAddress)...")
+                self.providerLogger.debug("Start tunnel monitor with address: \(probeAddress).")
 
                 do {
                     try newtTunnelMonitor.start(address: probeAddress)
-
-                    self.providerLogger.debug("Started tunnel monitor.")
                 } catch {
-                    self.providerLogger.error(chainedError: AnyChainedError(error), message: "Failed to start the tunnel monitor")
+                    self.providerLogger.error(chainedError: AnyChainedError(error), message: "Failed to start the tunnel monitor.")
                     self.startTunnelCompletionHandler = nil
 
                     self.adapter.stop { _ in
@@ -226,52 +224,52 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
     // MARK: - TunnelMonitor
 
-    func tunnelMonitor(_ tunnelMonitor: TunnelMonitor, connectionStatusDidChange status: TunnelMonitor.ConnectionStatus) {
+    func tunnelMonitorDidDetermineConnectionEstablished(_ tunnelMonitor: TunnelMonitor) {
         dispatchPrecondition(condition: .onQueue(dispatchQueue))
 
-        switch status {
-        case .established:
-            startTunnelCompletionHandler?(nil)
-            startTunnelCompletionHandler = nil
+        providerLogger.debug("Connection established.")
 
+        startTunnelCompletionHandler?(nil)
+        startTunnelCompletionHandler = nil
+    }
+
+    func tunnelMonitorDelegateShouldHandleConnectionRecovery(_ tunnelMonitor: TunnelMonitor) {
+        dispatchPrecondition(condition: .onQueue(dispatchQueue))
+
+        guard let startTunnelCompletionHandler = startTunnelCompletionHandler else { return }
+
+        providerLogger.debug("Recover connection. Picking next relay...")
+
+        let handleRecoveryFailure = { (_ error: PacketTunnelProviderError) in
+            // Stop tunnel monitor.
             tunnelMonitor.stop()
 
-        case .lost:
-            guard let startTunnelCompletionHandler = startTunnelCompletionHandler else { return }
+            // Call completion handler with error.
+            startTunnelCompletionHandler(error)
 
-            providerLogger.debug("Trying to connect to different relay.")
+            // Reset completion handler.
+            self.startTunnelCompletionHandler = nil
+        }
 
-            // Read tunnel configuration.
-            let tunnelConfiguration: PacketTunnelConfiguration
-            switch makeConfiguration(nil) {
-            case .success(let configuration):
-                tunnelConfiguration = configuration
+        // Read tunnel configuration.
+        let tunnelConfiguration: PacketTunnelConfiguration
+        switch makeConfiguration(nil) {
+        case .success(let configuration):
+            tunnelConfiguration = configuration
 
-            case .failure(let error):
-                providerLogger.error(chainedError: error, message: "Failed to produce tunnel configuration to reconnect to different relay.")
+        case .failure(let error):
+            handleRecoveryFailure(error)
+            return
+        }
 
-                tunnelMonitor.stop()
+        // Set tunnel connection info.
+        self.tunnelConnectionInfo = tunnelConfiguration.selectorResult.tunnelConnectionInfo
 
-                startTunnelCompletionHandler(error)
-                self.startTunnelCompletionHandler = nil
-                return
-            }
-
-            // Set tunnel connection info.
-            let tunnelConnectionInfo = tunnelConfiguration.selectorResult.tunnelConnectionInfo
-            self.tunnelConnectionInfo = tunnelConnectionInfo
-
-            // Update WireGuard configuration.
-            adapter.update(tunnelConfiguration: tunnelConfiguration.wgTunnelConfig) { error in
-                self.dispatchQueue.async {
-                    if let error = error {
-                        let tunnelProviderError = PacketTunnelProviderError.updateWireguardConfiguration(error)
-
-                        tunnelMonitor.stop()
-
-                        startTunnelCompletionHandler(tunnelProviderError)
-                        self.startTunnelCompletionHandler = nil
-                    }
+        // Update WireGuard configuration.
+        adapter.update(tunnelConfiguration: tunnelConfiguration.wgTunnelConfig) { error in
+            self.dispatchQueue.async {
+                if let error = error {
+                    handleRecoveryFailure(.updateWireguardConfiguration(error))
                 }
             }
         }
@@ -520,4 +518,3 @@ extension MullvadEndpoint {
         return Endpoint(host: .ipv6(ipv6Relay.ip), port: .init(integerLiteral: ipv6Relay.port))
     }
 }
-
