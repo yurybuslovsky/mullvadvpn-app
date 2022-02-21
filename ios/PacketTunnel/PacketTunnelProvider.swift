@@ -130,16 +130,16 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
                 // Start tunnel monitor.
                 let probeAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
-                self.providerLogger.debug("Starting tunnel monitor with probe address: \(probeAddress)...")
+                self.providerLogger.debug("Starting tunnel monitor with address: \(probeAddress)...")
 
-                switch newtTunnelMonitor.start(address: probeAddress) {
-                case .success:
+                do {
+                    try newtTunnelMonitor.start(address: probeAddress)
+
                     self.providerLogger.debug("Started tunnel monitor.")
-
-                case .failure(let error):
+                } catch {
                     self.providerLogger.error(chainedError: AnyChainedError(error), message: "Failed to start the tunnel monitor")
                     self.startTunnelCompletionHandler = nil
-                    
+
                     self.adapter.stop { _ in
                         completionHandler(PacketTunnelProviderError.startTunnelMonitor(error))
                     }
@@ -387,7 +387,7 @@ enum PacketTunnelProviderError: ChainedError {
     case updateWireguardConfiguration(WireGuardAdapterError)
 
     /// Failure to start tunnel monitor.
-    case startTunnelMonitor(TunnelMonitor.Error)
+    case startTunnelMonitor(Error)
 
     var errorDescription: String? {
         switch self {
