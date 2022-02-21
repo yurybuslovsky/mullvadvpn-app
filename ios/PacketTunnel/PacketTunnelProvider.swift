@@ -25,7 +25,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
     /// WireGuard adapter.
     private lazy var adapter: WireGuardAdapter = {
-        return WireGuardAdapter(with: self, logHandler: { [weak self] (logLevel, message) in
+        return WireGuardAdapter(with: self, shouldHandleReasserting: false, logHandler: { [weak self] (logLevel, message) in
             self?.dispatchQueue.async {
                 self?.tunnelLogger.log(level: logLevel.loggerLevel, "\(message)")
             }
@@ -250,10 +250,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
             case .failure(let error):
                 providerLogger.error(chainedError: error, message: "Failed to produce tunnel configuration to reconnect to different relay.")
 
+                tunnelMonitor.stop()
+
                 startTunnelCompletionHandler(error)
                 self.startTunnelCompletionHandler = nil
-
-                tunnelMonitor.stop()
                 return
             }
 
@@ -266,6 +266,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
                 self.dispatchQueue.async {
                     if let error = error {
                         let tunnelProviderError = PacketTunnelProviderError.updateWireguardConfiguration(error)
+
+                        tunnelMonitor.stop()
 
                         startTunnelCompletionHandler(tunnelProviderError)
                         self.startTunnelCompletionHandler = nil
