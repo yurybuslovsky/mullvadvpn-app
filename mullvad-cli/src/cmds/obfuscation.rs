@@ -1,11 +1,10 @@
 use crate::{new_rpc_client, Command, Result};
-use clap::value_t;
 
 use mullvad_management_interface::{types as grpc_types, ManagementServiceClient};
 
 use mullvad_types::relay_constraints::{CustomObfuscatorSettings, ObfuscationSettings};
 
-use std::{convert::TryFrom, net::SocketAddr};
+use std::convert::TryFrom;
 
 pub struct Obfuscation;
 
@@ -15,28 +14,28 @@ impl Command for Obfuscation {
         "obfuscation"
     }
 
-    fn clap_subcommand(&self) -> clap::App<'static, 'static> {
-        clap::SubCommand::with_name(self.name())
+    fn clap_subcommand(&self) -> clap::App<'static> {
+        clap::App::new(self.name())
             .about("Manage use of obfuscators")
             .setting(clap::AppSettings::SubcommandRequiredElseHelp)
             .subcommand(create_obfuscation_set_subcommand())
             .subcommand(create_obfuscation_get_subcommand())
     }
 
-    async fn run(&self, matches: &clap::ArgMatches<'_>) -> Result<()> {
+    async fn run(&self, matches: &clap::ArgMatches) -> Result<()> {
         match matches.subcommand() {
-            ("set", Some(set_matches)) => Self::handle_set(set_matches).await,
-            ("get", _) => Self::handle_get().await,
+            Some(("set", set_matches)) => Self::handle_set(set_matches).await,
+            Some(("get", _)) => Self::handle_get().await,
             _ => unreachable!("unhandled command"),
         }
     }
 }
 
 impl Obfuscation {
-    async fn handle_set(matches: &clap::ArgMatches<'_>) -> Result<()> {
+    async fn handle_set(matches: &clap::ArgMatches) -> Result<()> {
         use talpid_types::net::obfuscation::ObfuscatorType::*;
         match matches.subcommand() {
-            ("type", Some(type_matches)) => {
+            Some(("type", type_matches)) => {
                 let obfuscator_type = type_matches.value_of("type").unwrap();
                 let mut rpc = new_rpc_client().await?;
                 let mut settings = Self::get_obfuscation_settings(&mut rpc).await?;
@@ -57,11 +56,13 @@ impl Obfuscation {
                 }
                 Self::set_obfuscation_settings(&mut rpc, &settings).await?;
             }
-            ("custom-settings", Some(custom_settings)) => {
-                let address = value_t!(custom_settings.value_of("address"), SocketAddr)
-                    .unwrap_or_else(|e| e.exit());
-                let endpoint = value_t!(custom_settings.value_of("endpoint"), SocketAddr)
-                    .unwrap_or_else(|e| e.exit());
+            Some(("custom-settings", custom_settings)) => {
+                let address = custom_settings.value_of_t_or_exit("address");
+                // value_t!(custom_settings.value_of("address"), SocketAddr)
+                //     .unwrap_or_else(|e| e.exit());
+                let endpoint = custom_settings.value_of_t_or_exit("endpoint");
+                // value_t!(custom_settings.value_of("endpoint"), SocketAddr)
+                //     .unwrap_or_else(|e| e.exit());
 
                 let mut rpc = new_rpc_client().await?;
                 let mut settings = Self::get_obfuscation_settings(&mut rpc).await?;
@@ -107,15 +108,15 @@ impl Obfuscation {
     }
 }
 
-fn create_obfuscation_set_subcommand() -> clap::App<'static, 'static> {
-    clap::SubCommand::with_name("set")
+fn create_obfuscation_set_subcommand() -> clap::App<'static> {
+    clap::App::new("set")
         .about("Set obfuscation settings")
         .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
-            clap::SubCommand::with_name("type")
+            clap::App::new("type")
                 .about("Set obfuscation type")
                 .arg(
-                    clap::Arg::with_name("type")
+                    clap::Arg::new("type")
                         .help("Specifies what kind of obfuscation should be used, if any")
                         .required(true)
                         .index(1)
@@ -123,16 +124,16 @@ fn create_obfuscation_set_subcommand() -> clap::App<'static, 'static> {
                 ),
         )
         .subcommand(
-            clap::SubCommand::with_name("custom-settings")
+            clap::App::new("custom-settings")
                 .about("Specifies the config for a custom obfuscator")
                 .arg(
-                    clap::Arg::with_name("address")
+                    clap::Arg::new("address")
                         .help("Address to which tunnel data will be sent")
                         .required(true)
                         .index(1),
                 )
                 .arg(
-                    clap::Arg::with_name("remote-endpoint")
+                    clap::Arg::new("remote-endpoint")
                         .help("Address of remote endpoint that will be used")
                         .required(true)
                         .index(2),
@@ -140,6 +141,6 @@ fn create_obfuscation_set_subcommand() -> clap::App<'static, 'static> {
         )
 }
 
-fn create_obfuscation_get_subcommand() -> clap::App<'static, 'static> {
-    clap::SubCommand::with_name("get").about("Get obfuscation settings")
+fn create_obfuscation_get_subcommand() -> clap::App<'static> {
+    clap::App::new("get").about("Get obfuscation settings")
 }
