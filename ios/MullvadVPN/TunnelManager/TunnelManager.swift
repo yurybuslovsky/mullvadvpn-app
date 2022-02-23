@@ -627,15 +627,13 @@ class TunnelManager: TunnelManagerStateDelegate
     // MARK: - Tunnel connection info polling
 
     private func startTunnelConnectionInfoPolling() {
-        let isRestarting = tunnelConnectionInfoPollTimer != nil
-
-        if isRestarting {
-            logger.debug("Restart tunnel connection info polling.")
-        } else {
+        if tunnelConnectionInfoPollTimer == nil {
             logger.debug("Start tunnel connection info polling.")
+        } else {
+            logger.debug("Restart tunnel connection info polling.")
         }
 
-        cancelTunnelConnectionInfoPolling(forRestart: isRestarting)
+        cancelTunnelConnectionInfoPolling(forRestart: true)
 
         tunnelConnectionInfoPollTimer = DispatchSource.makeTimerSource(queue: stateQueue)
         tunnelConnectionInfoPollTimer?.setCancelHandler { [weak self] in
