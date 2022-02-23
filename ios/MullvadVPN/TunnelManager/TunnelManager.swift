@@ -714,7 +714,7 @@ extension TunnelManager {
         } else {
             logger.debug("Private key rotation was cancelled")
 
-            return Date(timeIntervalSinceNow: Self.privateKeyRotationFailureRetryInterval)
+            return Date(timeIntervalSinceNow: configuration.privateKeyRotationFailureRetryInterval)
         }
     }
 
@@ -739,7 +739,7 @@ extension TunnelManager {
             return nil
 
         default:
-            return Date(timeIntervalSinceNow: Self.privateKeyRotationFailureRetryInterval)
+            return Date(timeIntervalSinceNow: configuration.privateKeyRotationFailureRetryInterval)
         }
     }
 }
