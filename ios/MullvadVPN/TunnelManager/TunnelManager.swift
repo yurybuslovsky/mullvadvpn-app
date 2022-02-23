@@ -52,6 +52,9 @@ class TunnelManager: TunnelManagerStateDelegate
 
     private let state: TunnelManager.State
 
+    private var privateKeyRotationTimer: DispatchSourceTimer?
+    private var isRunningPeriodicPrivateKeyRotation = false
+
     var tunnelInfo: TunnelInfo? {
         return state.tunnelInfo
     }
@@ -74,9 +77,6 @@ class TunnelManager: TunnelManagerStateDelegate
     }
 
     // MARK: - Periodic private key rotation
-
-    private var privateKeyRotationTimer: DispatchSourceTimer?
-    private var isRunningPeriodicPrivateKeyRotation = false
 
     func startPeriodicPrivateKeyRotation() {
         stateQueue.async {
