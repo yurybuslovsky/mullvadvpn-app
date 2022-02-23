@@ -12,7 +12,10 @@ import WireGuardKit
 import Logging
 
 protocol TunnelMonitorDelegate: AnyObject {
+    /// Invoked when tunnel monitor determined that connection is established.
     func tunnelMonitorDidDetermineConnectionEstablished(_ tunnelMonitor: TunnelMonitor)
+
+    /// Invoked when tunnel monitor determined that connection attempt has failed.
     func tunnelMonitorDelegateShouldHandleConnectionRecovery(_ tunnelMonitor: TunnelMonitor)
 }
 
@@ -42,6 +45,7 @@ class TunnelMonitor {
     private var pathMonitor: NWPathMonitor?
     private var networkBytesReceived: UInt64 = 0
     private var lastAttemptDate = Date()
+    private var lastError: Error?
     private var isPinging = false
 
     private var logger = Logger(label: "TunnelMonitor")
@@ -88,6 +92,7 @@ class TunnelMonitor {
         address = pingAddress
         networkBytesReceived = 0
         lastAttemptDate = Date()
+        lastError = nil
 
         let newPathMonitor = NWPathMonitor()
         newPathMonitor.pathUpdateHandler = { [weak self] path in
@@ -101,6 +106,7 @@ class TunnelMonitor {
 
     private func stopNoQueue() {
         address = nil
+        lastError = nil
 
         pathMonitor?.cancel()
         pathMonitor = nil
@@ -190,6 +196,9 @@ class TunnelMonitor {
             // Reset the last recovery attempt date so that we periodically notify the delegate
             // to perform the recovery.
             lastAttemptDate = Date()
+
+            // Reset last error.
+            lastError = nil
         }
     }
 
@@ -198,17 +207,22 @@ class TunnelMonitor {
             return
         }
 
-        let hasConnectivity = isNetworkPathReachable(networkPath)
-
-        switch (hasConnectivity, isPinging) {
+        switch (isNetworkPathReachable(networkPath), isPinging) {
         case (true, false):
             logger.debug("Network is reachable. Starting to ping.")
 
             do {
                 try startPinging(address: address)
+
                 setWgStatsTimer()
+            } catch let error as Pinger.Error {
+                // Throttle logging errors when the same error is emitted multiple times.
+                if error != (lastError as? Pinger.Error) {
+                    logger.error(chainedError: AnyChainedError(error), message: "Failed to start pinging.")
+                    lastError = error
+                }
             } catch {
-                logger.error(chainedError: AnyChainedError(error), message: "Failed to start pinging.")
+                fatalError()
             }
 
         case (false, true):

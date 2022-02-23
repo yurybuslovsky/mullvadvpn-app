@@ -201,7 +201,7 @@ class Pinger {
 }
 
 extension Pinger {
-    enum Error: LocalizedError {
+    enum Error: LocalizedError, Equatable {
         /// Failure to create a socket.
         case createSocket
 
