@@ -24,18 +24,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     private let dispatchQueue = DispatchQueue(label: "PacketTunnel", qos: .utility)
 
     /// WireGuard adapter.
-    private lazy var adapter: WireGuardAdapter = {
-        return WireGuardAdapter(with: self, shouldHandleReasserting: false, logHandler: { [weak self] (logLevel, message) in
-            self?.dispatchQueue.async {
-                self?.tunnelLogger.log(level: logLevel.loggerLevel, "\(message)")
-            }
-        })
-    }()
+    private var adapter: WireGuardAdapter!
 
     private var startTunnelCompletionHandler: ((Error?) -> Void)?
 
     /// Tunnel monitor.
-    private var tunnelMonitor: TunnelMonitor?
+    private var tunnelMonitor: TunnelMonitor!
 
     /// Tunnel connection info.
     private var tunnelConnectionInfo: TunnelConnectionInfo? {
@@ -58,6 +52,17 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
         providerLogger = Logger(label: "PacketTunnelProvider")
         tunnelLogger = Logger(label: "WireGuard")
+
+        super.init()
+
+        adapter = WireGuardAdapter(with: self, shouldHandleReasserting: false, logHandler: { [weak self] (logLevel, message) in
+            self?.dispatchQueue.async {
+                self?.tunnelLogger.log(level: logLevel.loggerLevel, "\(message)")
+            }
+        })
+
+        tunnelMonitor = TunnelMonitor(queue: dispatchQueue, adapter: adapter)
+        tunnelMonitor.delegate = self
     }
 
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
@@ -137,8 +142,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
         dispatchQueue.async {
             // Stop tunnel monitor.
-            self.tunnelMonitor?.stop()
-            self.tunnelMonitor = nil
+            self.tunnelMonitor.stop()
 
             // Unset the start tunnel completion handler.
             self.startTunnelCompletionHandler = nil
