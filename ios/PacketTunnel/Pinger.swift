@@ -21,7 +21,7 @@ class Pinger {
     private let interfaceName: String?
 
     private let logger = Logger(label: "Pinger")
-    private let stateLock = NSLock()
+    private let stateLock = NSRecursiveLock()
     private var timer: DispatchSourceTimer?
 
     init(address: IPv4Address, interfaceName: String?) {
@@ -36,6 +36,8 @@ class Pinger {
     func start(delay: DispatchTimeInterval, repeating repeatInterval: DispatchTimeInterval) -> Result<(), Pinger.Error> {
         stateLock.lock()
         defer { stateLock.unlock() }
+        
+        stop()
 
         guard let newSocket = CFSocketCreate(kCFAllocatorDefault, AF_INET, SOCK_DGRAM, IPPROTO_ICMP, 0, nil, nil) else {
             return .failure(.createSocket)
@@ -61,13 +63,7 @@ class Pinger {
             self?.send()
         }
 
-        if let socket = socket {
-            CFSocketInvalidate(socket)
-        }
-
         socket = newSocket
-
-        timer?.cancel()
         timer = newTimer
 
         newTimer.schedule(wallDeadline: .now() + delay, repeating: repeatInterval)
@@ -78,6 +74,7 @@ class Pinger {
 
     func stop() {
         stateLock.lock()
+        defer { stateLock.unlock() }
 
         if let socket = socket {
             CFSocketInvalidate(socket)
@@ -87,8 +84,6 @@ class Pinger {
 
         timer?.cancel()
         timer = nil
-
-        stateLock.unlock()
     }
 
     private func send() {
