@@ -14,6 +14,9 @@ import Logging
 import class WireGuardKit.PublicKey
 
 struct TunnelManagerConfiguration {
+    /// Tunnel connection info poll interval used in connecting and reasserting states.
+    let tunnelConnectionInfoPollInterval: TimeInterval = 10
+
     /// Private key rotation interval (in seconds)
     let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
 
@@ -54,6 +57,8 @@ class TunnelManager: TunnelManagerStateDelegate
 
     private var privateKeyRotationTimer: DispatchSourceTimer?
     private var isRunningPeriodicPrivateKeyRotation = false
+
+    private var tunnelConnectionInfoPollTimer: DispatchSourceTimer?
 
     var tunnelInfo: TunnelInfo? {
         return state.tunnelInfo
@@ -502,13 +507,28 @@ class TunnelManager: TunnelManagerStateDelegate
     }
 
     /// Update `TunnelState` from `NEVPNStatus`.
-    /// Collects the `TunnelConnectionInfo` from the tunnel via IPC if needed before assigning the `tunnelState`
+    /// Collects the `TunnelConnectionInfo` from the tunnel via IPC if needed before assigning
+    /// the `tunnelState`.
     private func updateTunnelState() {
         dispatchPrecondition(condition: .onQueue(stateQueue))
 
         guard let connectionStatus = self.state.tunnelProvider?.connection.status else { return }
 
         logger.debug("VPN status changed to \(connectionStatus)")
+
+        switch connectionStatus {
+        case .connecting, .reasserting:
+            // Start polling tunnel connection info to keep the relay information up to date
+            // while the tunnel process is trying to connect.
+            startTunnelConnectionInfoPolling()
+
+        case .connected, .disconnecting, .disconnected:
+            // Stop polling once connected or transitioning/already in disconnected state.
+            cancelTunnelConnectionInfoPolling(forRestart: false)
+
+        default:
+            break
+        }
 
         let operation = MapConnectionStatusOperation(queue: stateQueue, state: state, connectionStatus: connectionStatus) { [weak self] in
             guard let self = self else { return }
@@ -600,6 +620,40 @@ class TunnelManager: TunnelManagerStateDelegate
         exclusivityController.addOperation(operation, categories: [OperationCategory.changeTunnelSettings])
 
         operationQueue.addOperation(operation)
+    }
+
+
+
+    // MARK: - Tunnel connection info polling
+
+    private func startTunnelConnectionInfoPolling() {
+        let isRestarting = tunnelConnectionInfoPollTimer != nil
+
+        if isRestarting {
+            logger.debug("Restart tunnel connection info polling.")
+        } else {
+            logger.debug("Start tunnel connection info polling.")
+        }
+
+        cancelTunnelConnectionInfoPolling(forRestart: isRestarting)
+
+        tunnelConnectionInfoPollTimer = DispatchSource.makeTimerSource(queue: stateQueue)
+        tunnelConnectionInfoPollTimer?.setCancelHandler { [weak self] in
+            self?.logger.debug("Poll tunnel connection info.")
+            self?.updateTunnelState()
+        }
+
+        tunnelConnectionInfoPollTimer?.schedule(wallDeadline: .now(), repeating: configuration.tunnelConnectionInfoPollInterval)
+        tunnelConnectionInfoPollTimer?.activate()
+    }
+
+    private func cancelTunnelConnectionInfoPolling(forRestart: Bool) {
+        if !forRestart {
+            logger.debug("Stop tunnel connection info polling.")
+        }
+
+        tunnelConnectionInfoPollTimer?.cancel()
+        tunnelConnectionInfoPollTimer = nil
     }
 
 }
