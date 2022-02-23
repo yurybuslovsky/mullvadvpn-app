@@ -71,7 +71,7 @@ class TunnelMonitor {
     }
 
     deinit {
-        stopNoQueue()
+        stopNoQueue(forRestart: false)
     }
 
     func start(address: IPv4Address) {
@@ -82,12 +82,20 @@ class TunnelMonitor {
 
     func stop() {
         internalQueue.async {
-            self.stopNoQueue()
+            self.stopNoQueue(forRestart: false)
         }
     }
 
     private func startNoQueue(address pingAddress: IPv4Address) {
-        stopNoQueue()
+        let isRestarting = address != nil
+        
+        if isRestarting {
+            logger.debug("Restart tunnel monitor with address: \(pingAddress).")
+        } else {
+            logger.debug("Start tunnel monitor with address: \(pingAddress).")
+        }
+
+        stopNoQueue(forRestart: isRestarting)
 
         address = pingAddress
         networkBytesReceived = 0
@@ -104,7 +112,11 @@ class TunnelMonitor {
         handleNetworkPathUpdate(newPathMonitor.currentPath)
     }
 
-    private func stopNoQueue() {
+    private func stopNoQueue(forRestart: Bool) {
+        if !forRestart {
+            logger.debug("Stop tunnel monitor.")
+        }
+
         address = nil
         lastError = nil
 
@@ -186,7 +198,7 @@ class TunnelMonitor {
             }
 
             // Stop the tunnel monitor.
-            stopNoQueue()
+            stopNoQueue(forRestart: false)
         } else if Date().timeIntervalSince(lastAttemptDate) >= configuration.connectionTimeout {
             // Tell delegate to attempt the connection recovery.
             delegateQueue.async {
