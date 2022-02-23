@@ -13,15 +13,19 @@ import UIKit
 import Logging
 import class WireGuardKit.PublicKey
 
+struct TunnelManagerConfiguration {
+    /// Private key rotation interval (in seconds)
+    let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
+
+    /// Private key rotation retry interval (in seconds)
+    let privateKeyRotationFailureRetryInterval: TimeInterval = 60 * 15
+}
+
 /// A class that provides a convenient interface for VPN tunnels configuration, manipulation and
 /// monitoring.
 class TunnelManager: TunnelManagerStateDelegate
 {
-    /// Private key rotation interval (in seconds)
-    private static let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
-
-    /// Private key rotation retry interval (in seconds)
-    private static let privateKeyRotationFailureRetryInterval: TimeInterval = 60 * 15
+    private let configuration = TunnelManagerConfiguration()
 
     /// Operation categories
     private enum OperationCategory {
@@ -106,7 +110,7 @@ class TunnelManager: TunnelManagerStateDelegate
 
         if let tunnelInfo = self.state.tunnelInfo {
             let creationDate = tunnelInfo.tunnelSettings.interface.privateKey.creationDate
-            let scheduleDate = Date(timeInterval: Self.privateKeyRotationInterval, since: creationDate)
+            let scheduleDate = Date(timeInterval: configuration.privateKeyRotationInterval, since: creationDate)
 
             schedulePrivateKeyRotationTimer(scheduleDate)
         } else {
@@ -357,7 +361,7 @@ class TunnelManager: TunnelManagerStateDelegate
             queue: stateQueue,
             state: state,
             restClient: restClient,
-            rotationInterval: Self.privateKeyRotationInterval) { [weak self] completion in
+            rotationInterval: configuration.privateKeyRotationInterval) { [weak self] completion in
                 guard let self = self else { return }
 
                 dispatchPrecondition(condition: .onQueue(self.stateQueue))
@@ -644,7 +648,7 @@ extension TunnelManager {
     func scheduleBackgroundTask() -> Result<(), TunnelManager.Error> {
         if let tunnelInfo = self.state.tunnelInfo {
             let creationDate = tunnelInfo.tunnelSettings.interface.privateKey.creationDate
-            let beginDate = Date(timeInterval: Self.privateKeyRotationInterval, since: creationDate)
+            let beginDate = Date(timeInterval: configuration.privateKeyRotationInterval, since: creationDate)
 
             return submitBackgroundTask(at: beginDate)
         } else {
@@ -717,10 +721,10 @@ extension TunnelManager {
     fileprivate func nextScheduleDate(_ result: KeyRotationResult) -> Date {
         switch result {
         case .finished:
-            return Date(timeIntervalSinceNow: Self.privateKeyRotationInterval)
+            return Date(timeIntervalSinceNow: configuration.privateKeyRotationInterval)
 
         case .throttled(let lastKeyCreationDate):
-            return Date(timeInterval: Self.privateKeyRotationInterval, since: lastKeyCreationDate)
+            return Date(timeInterval: configuration.privateKeyRotationInterval, since: lastKeyCreationDate)
         }
     }
 
