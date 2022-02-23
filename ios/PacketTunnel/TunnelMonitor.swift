@@ -45,7 +45,7 @@ class TunnelMonitor {
     private var pathMonitor: NWPathMonitor?
     private var networkBytesReceived: UInt64 = 0
     private var lastAttemptDate = Date()
-    private var lastError: Error?
+    private var lastError: Pinger.Error?
     private var isPinging = false
 
     private var logger = Logger(label: "TunnelMonitor")
@@ -127,12 +127,27 @@ class TunnelMonitor {
         stopPinging()
     }
 
-    private func startPinging(address: IPv4Address) throws {
+    private func startPinging(address: IPv4Address) -> Result<(), Pinger.Error> {
         let newPinger = Pinger(address: address, interfaceName: adapter.interfaceName)
-        try newPinger.start(delay: configuration.pingStartDelay, repeating: configuration.pingInterval)
+        if case .failure(let error) = newPinger.start(delay: configuration.pingStartDelay, repeating: configuration.pingInterval) {
+            return .failure(error)
+        }
+
+        let pingerResult = newPinger.start(delay: configuration.pingStartDelay, repeating: configuration.pingInterval)
+
+        switch pingerResult {
+        case .success:
+            pinger = newPinger
+            isPinging = true
+
+        case .failure:
+            break
+        }
 
         pinger = newPinger
         isPinging = true
+
+        return pingerResult
     }
 
     private func stopPinging() {
@@ -223,18 +238,15 @@ class TunnelMonitor {
         case (true, false):
             logger.debug("Network is reachable. Starting to ping.")
 
-            do {
-                try startPinging(address: address)
-
+            switch startPinging(address: address) {
+            case .success:
                 setWgStatsTimer()
-            } catch let error as Pinger.Error {
-                // Throttle logging errors when the same error is emitted multiple times.
-                if error != (lastError as? Pinger.Error) {
+
+            case .failure(let error):
+                if error != lastError {
                     logger.error(chainedError: AnyChainedError(error), message: "Failed to start pinging.")
                     lastError = error
                 }
-            } catch {
-                fatalError()
             }
 
         case (false, true):
