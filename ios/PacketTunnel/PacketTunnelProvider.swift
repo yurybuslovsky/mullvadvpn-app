@@ -121,27 +121,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
                 // the connection is established.
                 self.startTunnelCompletionHandler = completionHandler
 
-                // Create tunnel monitor.
-                let newtTunnelMonitor = TunnelMonitor(queue: self.dispatchQueue, adapter: self.adapter)
-                newtTunnelMonitor.delegate = self
-
-                // Store tunnel monitor.
-                self.tunnelMonitor = newtTunnelMonitor
-
                 // Start tunnel monitor.
-                let probeAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
-                self.providerLogger.debug("Start tunnel monitor with address: \(probeAddress).")
+                let gatewayAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
+                self.providerLogger.debug("Start tunnel monitor with gateway address: \(gatewayAddress).")
 
-                do {
-                    try newtTunnelMonitor.start(address: probeAddress)
-                } catch {
-                    self.providerLogger.error(chainedError: AnyChainedError(error), message: "Failed to start the tunnel monitor.")
-                    self.startTunnelCompletionHandler = nil
-
-                    self.adapter.stop { _ in
-                        completionHandler(PacketTunnelProviderError.startTunnelMonitor(error))
-                    }
-                }
+                self.tunnelMonitor = TunnelMonitor(queue: self.dispatchQueue, adapter: self.adapter)
+                self.tunnelMonitor?.delegate = self
+                self.tunnelMonitor?.start(address: gatewayAddress)
             }
         }
     }
