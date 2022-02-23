@@ -87,15 +87,13 @@ class TunnelMonitor {
     }
 
     private func startNoQueue(address pingAddress: IPv4Address) {
-        let isRestarting = address != nil
-        
-        if isRestarting {
-            logger.debug("Restart tunnel monitor with address: \(pingAddress).")
-        } else {
+        if address == nil {
             logger.debug("Start tunnel monitor with address: \(pingAddress).")
+        } else {
+            logger.debug("Restart tunnel monitor with address: \(pingAddress).")
         }
 
-        stopNoQueue(forRestart: isRestarting)
+        stopNoQueue(forRestart: true)
 
         address = pingAddress
         networkBytesReceived = 0
