@@ -381,9 +381,6 @@ enum PacketTunnelProviderError: ChainedError {
     /// Failure to update the Wireguard configuration
     case updateWireguardConfiguration(WireGuardAdapterError)
 
-    /// Failure to start tunnel monitor.
-    case startTunnelMonitor(Error)
-
     var errorDescription: String? {
         switch self {
         case .readRelayCache:
@@ -406,9 +403,6 @@ enum PacketTunnelProviderError: ChainedError {
 
         case .updateWireguardConfiguration:
             return "Failure to update the Wireguard configuration."
-
-        case .startTunnelMonitor:
-            return "Failure to start tunnel monitor."
         }
     }
 }
