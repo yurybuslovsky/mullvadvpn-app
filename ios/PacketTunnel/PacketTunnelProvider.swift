@@ -34,6 +34,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     /// connection is established.
     private var startTunnelCompletionHandler: ((PacketTunnelProviderError?) -> Void)?
 
+    /// A completion handler passed during reassertion and saved for later use once the connection
+    /// is reestablished.
+    private var reassertTunnelCompletionHandler: ((PacketTunnelProviderError?) -> Void)?
+
     /// Tunnel monitor.
     private var tunnelMonitor: TunnelMonitor!
 
@@ -187,7 +191,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
             case .reloadTunnelSettings:
                 self.providerLogger.debug("Reloading tunnel settings...")
 
-                self.reloadTunnelSettings { error in
+                self.reloadTunnelSettings { [weak self] error in
+                    guard let self = self else { return }
+
                     if let error = error {
                         self.providerLogger.error(chainedError: error, message: "Failed to reload tunnel settings.")
                     } else {
@@ -228,6 +234,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
         startTunnelCompletionHandler?(nil)
         startTunnelCompletionHandler = nil
+
+        reassertTunnelCompletionHandler?(nil)
+        reassertTunnelCompletionHandler = nil
     }
 
     func tunnelMonitorDelegateShouldHandleConnectionRecovery(_ tunnelMonitor: TunnelMonitor) {
@@ -244,6 +253,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
             // Reset start tunnel completion handler.
             self.startTunnelCompletionHandler = nil
+
+            // Call tunnel reassertion completion handler with error.
+            self.reassertTunnelCompletionHandler?(error)
+
+            // Reset tunnel reassertion completion handler.
+            self.reassertTunnelCompletionHandler = nil
         }
 
         // Read tunnel configuration.
@@ -325,16 +340,49 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
         let oldTunnelConnectionInfo = self.tunnelConnectionInfo
         self.tunnelConnectionInfo = tunnelConnectionInfo
 
+        // Raise reasserting flag, but only if tunnel has already moved to connected state once.
+        // Otherwise keep the app in connecting state until it manages to establish the very first
+        // connection.
+        if isConnected {
+            reasserting = true
+        }
+
         // Update WireGuard configuration.
         adapter.update(tunnelConfiguration: tunnelConfiguration.wgTunnelConfig) { error in
             self.dispatchQueue.async {
-                let tunnelProviderError = error.map { PacketTunnelProviderError.updateWireguardConfiguration($0) }
+                // Reset previously stored completion handler.
+                self.reassertTunnelCompletionHandler = nil
 
-                if tunnelProviderError != nil {
+                // Call completion handler immediately on error to update adapter configuration.
+                if let error = error {
+                    // Revert to previously used tunnel connection info.
                     self.tunnelConnectionInfo = oldTunnelConnectionInfo
-                }
 
-                completionHandler(tunnelProviderError)
+                    // Lower the reasserting flag.
+                    if self.isConnected {
+                        self.reasserting = false
+                    }
+
+                    // Call completion handler immediately.
+                    completionHandler(.updateWireguardConfiguration(error))
+                } else {
+                    // Store completion handler and call it from TunnelMonitorDelegate once
+                    // the connection is established.
+                    self.reassertTunnelCompletionHandler = { [weak self] providerError in
+                        guard let self = self else { return }
+
+                        // Lower the reasserting flag.
+                        if self.isConnected {
+                            self.reasserting = false
+                        }
+
+                        completionHandler(providerError)
+                    }
+
+                    // Restart tunnel monitor.
+                    let gatewayAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
+                    self.tunnelMonitor.start(address: gatewayAddress)
+                }
             }
         }
     }
