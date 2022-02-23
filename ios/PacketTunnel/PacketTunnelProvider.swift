@@ -26,7 +26,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     /// WireGuard adapter.
     private var adapter: WireGuardAdapter!
 
-    private var startTunnelCompletionHandler: ((Error?) -> Void)?
+    /// Raised once tunnel establishes connection in the very first time, before calling the system
+    /// completion handler passed into `startTunnel`.
+    private var isConnected = false
+
+    /// A system completion handler passed from startTunnel and saved for later use once the
+    /// connection is established.
+    private var startTunnelCompletionHandler: ((PacketTunnelProviderError?) -> Void)?
 
     /// Tunnel monitor.
     private var tunnelMonitor: TunnelMonitor!
@@ -112,27 +118,28 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
         // Start tunnel.
         adapter.start(tunnelConfiguration: tunnelConfiguration.wgTunnelConfig) { error in
             self.dispatchQueue.async {
-                let tunnelProviderError = error.map { PacketTunnelProviderError.startWireguardAdapter($0) }
-                if let tunnelProviderError = tunnelProviderError {
+                if let error = error {
+                    let tunnelProviderError = PacketTunnelProviderError.startWireguardAdapter(error)
                     self.providerLogger.error(chainedError: tunnelProviderError, message: "Failed to start the tunnel.")
 
                     completionHandler(tunnelProviderError)
-                    return
+                } else {
+                    self.providerLogger.debug("Started the tunnel.")
+
+                    // Store completion handler and call it from TunnelMonitorDelegate once
+                    // the connection is established.
+                    self.startTunnelCompletionHandler = { [weak self] error in
+                        // Mark the tunnel connected.
+                        self?.isConnected = true
+
+                        // Call system completion handler.
+                        completionHandler(error)
+                    }
+
+                    // Start tunnel monitor.
+                    let gatewayAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
+                    self.tunnelMonitor.start(address: gatewayAddress)
                 }
-
-                self.providerLogger.debug("Started the tunnel.")
-
-                // Store completion handler and call it from TunnelMonitorDelegate once
-                // the connection is established.
-                self.startTunnelCompletionHandler = completionHandler
-
-                // Start tunnel monitor.
-                let gatewayAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
-                self.providerLogger.debug("Start tunnel monitor with gateway address: \(gatewayAddress).")
-
-                self.tunnelMonitor = TunnelMonitor(queue: self.dispatchQueue, adapter: self.adapter)
-                self.tunnelMonitor?.delegate = self
-                self.tunnelMonitor?.start(address: gatewayAddress)
             }
         }
     }
@@ -226,18 +233,16 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     func tunnelMonitorDelegateShouldHandleConnectionRecovery(_ tunnelMonitor: TunnelMonitor) {
         dispatchPrecondition(condition: .onQueue(dispatchQueue))
 
-        guard let startTunnelCompletionHandler = startTunnelCompletionHandler else { return }
-
         providerLogger.debug("Recover connection. Picking next relay...")
 
         let handleRecoveryFailure = { (_ error: PacketTunnelProviderError) in
             // Stop tunnel monitor.
             tunnelMonitor.stop()
 
-            // Call completion handler with error.
-            startTunnelCompletionHandler(error)
+            // Call start tunnel completion handler with error.
+            self.startTunnelCompletionHandler?(error)
 
-            // Reset completion handler.
+            // Reset start tunnel completion handler.
             self.startTunnelCompletionHandler = nil
         }
 
