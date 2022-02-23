@@ -129,23 +129,12 @@ class TunnelMonitor {
 
     private func startPinging(address: IPv4Address) -> Result<(), Pinger.Error> {
         let newPinger = Pinger(address: address, interfaceName: adapter.interfaceName)
-        if case .failure(let error) = newPinger.start(delay: configuration.pingStartDelay, repeating: configuration.pingInterval) {
-            return .failure(error)
-        }
-
         let pingerResult = newPinger.start(delay: configuration.pingStartDelay, repeating: configuration.pingInterval)
 
-        switch pingerResult {
-        case .success:
+        if case .success = pingerResult {
             pinger = newPinger
             isPinging = true
-
-        case .failure:
-            break
         }
-
-        pinger = newPinger
-        isPinging = true
 
         return pingerResult
     }
