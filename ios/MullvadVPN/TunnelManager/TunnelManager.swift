@@ -14,8 +14,8 @@ import Logging
 import class WireGuardKit.PublicKey
 
 struct TunnelManagerConfiguration {
-    /// Tunnel connection info poll interval used in connecting and reasserting states.
-    let tunnelConnectionInfoPollInterval: TimeInterval = 10
+    /// Periodicity of polling the current relay
+    let relayPollInterval: TimeInterval = 15
 
     /// Private key rotation interval (in seconds)
     let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
@@ -26,8 +26,7 @@ struct TunnelManagerConfiguration {
 
 /// A class that provides a convenient interface for VPN tunnels configuration, manipulation and
 /// monitoring.
-class TunnelManager: TunnelManagerStateDelegate
-{
+final class TunnelManager: TunnelManagerStateDelegate {
     private let configuration = TunnelManagerConfiguration()
 
     /// Operation categories
@@ -58,7 +57,8 @@ class TunnelManager: TunnelManagerStateDelegate
     private var privateKeyRotationTimer: DispatchSourceTimer?
     private var isRunningPeriodicPrivateKeyRotation = false
 
-    private var tunnelConnectionInfoPollTimer: DispatchSourceTimer?
+    private var relayPollTimer: DispatchSourceTimer?
+    private var isPollingRelay = false
 
     var tunnelInfo: TunnelInfo? {
         return state.tunnelInfo
@@ -520,13 +520,13 @@ class TunnelManager: TunnelManagerStateDelegate
         case .connecting, .reasserting:
             // Start polling tunnel connection info to keep the relay information up to date
             // while the tunnel process is trying to connect.
-            startTunnelConnectionInfoPolling()
+            startPollingRelay()
 
-        case .connected, .disconnecting, .disconnected:
-            // Stop polling once connected or transitioning/already in disconnected state.
-            cancelTunnelConnectionInfoPolling(forRestart: false)
+        case .connected, .disconnecting, .disconnected, .invalid:
+            // Stop polling once connection moved to final state.
+            cancelPollingRelay()
 
-        default:
+        @unknown default:
             break
         }
 
@@ -624,34 +624,40 @@ class TunnelManager: TunnelManagerStateDelegate
 
 
 
-    // MARK: - Tunnel connection info polling
+    // MARK: - Tunnel relay polling.
 
-    private func startTunnelConnectionInfoPolling() {
-        if tunnelConnectionInfoPollTimer == nil {
-            logger.debug("Start tunnel connection info polling.")
-        } else {
-            logger.debug("Restart tunnel connection info polling.")
+    private func startPollingRelay() {
+        guard !isPollingRelay else { return }
+
+        logger.debug("Start tunnel relay polling.")
+
+        cancelPollingRelay()
+
+        isPollingRelay = true
+
+        let newTimer = DispatchSource.makeTimerSource(queue: stateQueue)
+        newTimer.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            self.updateTunnelState()
         }
 
-        cancelTunnelConnectionInfoPolling(forRestart: true)
+        relayPollTimer = newTimer
 
-        tunnelConnectionInfoPollTimer = DispatchSource.makeTimerSource(queue: stateQueue)
-        tunnelConnectionInfoPollTimer?.setCancelHandler { [weak self] in
-            self?.logger.debug("Poll tunnel connection info.")
-            self?.updateTunnelState()
-        }
+        let startDate: DispatchWallTime = .now() + configuration.relayPollInterval
+        newTimer.schedule(wallDeadline: startDate, repeating: configuration.relayPollInterval)
 
-        tunnelConnectionInfoPollTimer?.schedule(wallDeadline: .now(), repeating: configuration.tunnelConnectionInfoPollInterval)
-        tunnelConnectionInfoPollTimer?.activate()
+        newTimer.activate()
     }
 
-    private func cancelTunnelConnectionInfoPolling(forRestart: Bool) {
-        if !forRestart {
-            logger.debug("Stop tunnel connection info polling.")
-        }
+    private func cancelPollingRelay() {
+        guard isPollingRelay else { return }
 
-        tunnelConnectionInfoPollTimer?.cancel()
-        tunnelConnectionInfoPollTimer = nil
+        logger.debug("Stop tunnel relay polling.")
+
+        relayPollTimer?.cancel()
+        relayPollTimer = nil
+
+        isPollingRelay = false
     }
 
 }
