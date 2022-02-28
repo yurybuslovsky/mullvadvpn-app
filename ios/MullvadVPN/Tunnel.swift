@@ -16,6 +16,10 @@ typealias TunnelProviderManagerType = SimulatorTunnelProviderManager
 typealias TunnelProviderManagerType = NETunnelProviderManager
 #endif
 
+protocol TunnelStatusObserver {
+    func tunnel(_ tunnel: Tunnel, didReceiveStatus status: NEVPNStatus)
+}
+
 /// Tunnel wrapper class.
 class Tunnel {
     /// Tunnel provider manager.
@@ -48,7 +52,7 @@ class Tunnel {
     }
 
     private let lock = NSLock()
-    private var observerList = ObserverList<Tunnel.AnyStatusObserver>()
+    private var observerList = ObserverList<TunnelStatusObserver>()
     
     private var _startDate: Date?
 
@@ -86,25 +90,27 @@ class Tunnel {
         tunnelProvider.removeFromPreferences(completionHandler: completion)
     }
 
-    func observeStatus(queue: DispatchQueue? = nil, body: @escaping (NEVPNStatus) -> Void) -> StatusObserver {
-        let observer = StatusObserver(tunnel: self, queue: queue, body: body)
+    func observeStatus(queue: DispatchQueue? = nil, handler: @escaping (Tunnel, NEVPNStatus) -> Void) -> StatusBlockObserver {
+        let observer = StatusBlockObserver(tunnel: self, queue: queue, handler: handler)
 
-        observerList.append(AnyStatusObserver(observer))
+        observerList.append(observer)
 
         return observer
     }
 
-    private func removeObserver(_ observer: StatusObserver) {
-        observerList.remove(AnyStatusObserver(observer))
+    private func removeObserver(_ observer: TunnelStatusObserver) {
+        observerList.remove(observer)
     }
 
     @objc private func handleVPNStatusChangeNotification(_ notification: Notification) {
         guard let connection = notification.object as? VPNConnectionProtocol else { return }
 
-        handleVPNStatus(connection.status)
+        let newStatus = connection.status
+
+        handleVPNStatus(newStatus)
 
         observerList.forEach { observer in
-            observer.receive(status: status)
+            observer.tunnel(self, didReceiveStatus: newStatus)
         }
     }
 
@@ -144,49 +150,45 @@ extension Tunnel: Equatable {
 
 extension Tunnel {
 
-    fileprivate class AnyStatusObserver: WeakObserverBox {
-        weak var inner: StatusObserver?
+    final class StatusBlockObserver: TunnelStatusObserver {
+        typealias Handler = (Tunnel, NEVPNStatus) -> Void
 
-        init(_ inner: StatusObserver) {
-            self.inner = inner
-        }
-
-        func receive(status: NEVPNStatus) {
-            inner?.receive(status: status)
-        }
-
-        static func == (lhs: Tunnel.AnyStatusObserver, rhs: Tunnel.AnyStatusObserver) -> Bool {
-            return lhs.inner === rhs.inner
-        }
-    }
-
-    class StatusObserver {
         private weak var tunnel: Tunnel?
         private let queue: DispatchQueue?
-        private let body: (NEVPNStatus) -> Void
+        private let lock = NSLock()
+        private var handler: Handler?
 
-        fileprivate init(tunnel: Tunnel, queue: DispatchQueue?, body: @escaping (NEVPNStatus) -> Void) {
+        fileprivate init(tunnel: Tunnel, queue: DispatchQueue?, handler: @escaping Handler) {
             self.tunnel = tunnel
             self.queue = queue
-            self.body = body
-        }
-
-        fileprivate func receive(status: NEVPNStatus) {
-            if let queue = queue {
-                queue.async {
-                    self.body(status)
-                }
-            } else {
-                body(status)
-            }
+            self.handler = handler
         }
 
         func invalidate() {
+            lock.lock()
+            handler = nil
+            lock.unlock()
+
             tunnel?.removeObserver(self)
         }
 
-        deinit {
-            invalidate()
+        func tunnel(_ tunnel: Tunnel, didReceiveStatus status: NEVPNStatus) {
+            if let queue = queue {
+                queue.async {
+                    self.invokeHandler(tunnel: tunnel, status: status)
+                }
+            } else {
+                invokeHandler(tunnel: tunnel, status: status)
+            }
+        }
+
+        private func invokeHandler(tunnel: Tunnel, status: NEVPNStatus) {
+            lock.lock()
+            let block = handler
+            lock.unlock()
+
+            block?(tunnel, status)
         }
     }
+
 }

@@ -33,7 +33,7 @@ extension TunnelIPC {
         private let decoderHandler: DecoderHandler
         private var completionHandler: CompletionHandler?
 
-        private var statusObserver: Tunnel.StatusObserver?
+        private var statusObserver: Tunnel.StatusBlockObserver?
         private var timeoutWork: DispatchWorkItem?
         private var waitForConnectingStateWork: DispatchWorkItem?
 
@@ -80,7 +80,7 @@ extension TunnelIPC {
 
             setTimeoutTimer(connectingStateWaitDelay: 0)
 
-            statusObserver = tunnel.observeStatus(queue: queue) { [weak self] status in
+            statusObserver = tunnel.observeStatus(queue: queue) { [weak self] tunnel, status in
                 self?.handleVPNStatus(status)
             }
 

@@ -49,9 +49,9 @@ final class TunnelManager: TunnelManagerStateDelegate {
     private let operationQueue = OperationQueue()
     private let exclusivityController = ExclusivityController()
 
-    private var statusObserver: Tunnel.StatusObserver?
+    private var statusObserver: Tunnel.StatusBlockObserver?
     private var lastMapConnectionStatusOperation: Operation?
-    private let observerList = ObserverList<AnyTunnelObserver>()
+    private let observerList = ObserverList<TunnelObserver>()
 
     private let state: TunnelManager.State
 
@@ -441,12 +441,12 @@ final class TunnelManager: TunnelManagerStateDelegate {
     /// In order to cancel the observation, either call `removeObserver(_:)` or simply release
     /// the observer.
     func addObserver<T: TunnelObserver>(_ observer: T) {
-        observerList.append(AnyTunnelObserver(observer))
+        observerList.append(observer)
     }
 
     /// Remove tunnel observer.
     func removeObserver<T: TunnelObserver>(_ observer: T) {
-        observerList.remove(AnyTunnelObserver(observer))
+        observerList.remove(observer)
     }
 
     // MARK: - TunnelManagerStateDelegate
@@ -490,7 +490,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
     private func subscribeVPNStatusObserver(tunnel: Tunnel) {
         unsubscribeVPNStatusObserver()
 
-        statusObserver = tunnel.observeStatus(queue: stateQueue) { [weak self] status in
+        statusObserver = tunnel.observeStatus(queue: stateQueue) { [weak self] tunnel, status in
             self?.updateTunnelState()
         }
     }
