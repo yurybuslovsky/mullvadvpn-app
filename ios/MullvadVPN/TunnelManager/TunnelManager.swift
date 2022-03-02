@@ -440,12 +440,12 @@ final class TunnelManager: TunnelManagerStateDelegate {
     /// Add tunnel observer.
     /// In order to cancel the observation, either call `removeObserver(_:)` or simply release
     /// the observer.
-    func addObserver<T: TunnelObserver>(_ observer: T) {
+    func addObserver(_ observer: TunnelObserver) {
         observerList.append(observer)
     }
 
     /// Remove tunnel observer.
-    func removeObserver<T: TunnelObserver>(_ observer: T) {
+    func removeObserver(_ observer: TunnelObserver) {
         observerList.remove(observer)
     }
 
@@ -490,7 +490,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
     private func subscribeVPNStatusObserver(tunnel: Tunnel) {
         unsubscribeVPNStatusObserver()
 
-        statusObserver = tunnel.observeStatus(queue: stateQueue) { [weak self] tunnel, status in
+        statusObserver = tunnel.addBlockObserver(queue: stateQueue) { [weak self] tunnel, status in
             self?.updateTunnelState()
         }
     }

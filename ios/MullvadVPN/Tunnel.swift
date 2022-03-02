@@ -90,15 +90,19 @@ class Tunnel {
         tunnelProvider.removeFromPreferences(completionHandler: completion)
     }
 
-    func observeStatus(queue: DispatchQueue? = nil, handler: @escaping (Tunnel, NEVPNStatus) -> Void) -> StatusBlockObserver {
+    func addBlockObserver(queue: DispatchQueue? = nil, handler: @escaping (Tunnel, NEVPNStatus) -> Void) -> StatusBlockObserver {
         let observer = StatusBlockObserver(tunnel: self, queue: queue, handler: handler)
 
-        observerList.append(observer)
+        addObserver(observer)
 
         return observer
     }
 
-    private func removeObserver(_ observer: TunnelStatusObserver) {
+    func addObserver(_ observer: TunnelStatusObserver) {
+        observerList.append(observer)
+    }
+
+    func removeObserver(_ observer: TunnelStatusObserver) {
         observerList.remove(observer)
     }
 

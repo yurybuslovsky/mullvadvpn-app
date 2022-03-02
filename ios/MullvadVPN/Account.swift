@@ -221,11 +221,11 @@ class Account {
 
     // MARK: - Account observation
 
-    func addObserver<T: AccountObserver>(_ observer: T) {
+    func addObserver(_ observer: AccountObserver) {
         observerList.append(observer)
     }
 
-    func removeObserver<T: AccountObserver>(_ observer: T) {
+    func removeObserver(_ observer: AccountObserver) {
         observerList.remove(observer)
     }
 }

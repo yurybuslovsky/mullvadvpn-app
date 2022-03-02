@@ -144,11 +144,11 @@ extension RelayCache {
 
         // MARK: - Observation
 
-        func addObserver<T: RelayCacheObserver>(_ observer: T) {
+        func addObserver(_ observer: RelayCacheObserver) {
             observerList.append(observer)
         }
 
-        func removeObserver<T: RelayCacheObserver>(_ observer: T) {
+        func removeObserver(_ observer: RelayCacheObserver) {
             observerList.remove(observer)
         }
 

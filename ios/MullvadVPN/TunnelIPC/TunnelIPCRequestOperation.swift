@@ -80,7 +80,7 @@ extension TunnelIPC {
 
             setTimeoutTimer(connectingStateWaitDelay: 0)
 
-            statusObserver = tunnel.observeStatus(queue: queue) { [weak self] tunnel, status in
+            statusObserver = tunnel.addBlockObserver(queue: queue) { [weak self] tunnel, status in
                 self?.handleVPNStatus(status)
             }
 
