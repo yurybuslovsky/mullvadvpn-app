@@ -292,8 +292,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     }
 
     func tunnelMonitor(_ tunnelMonitor: TunnelMonitor, networkReachabilityStatusDidChange isNetworkReachable: Bool) {
-        self.tunnelStatus.isNetworkReachable = isNetworkReachable
-        self.tunnelStatus.reconnectAttemptDate = tunnelMonitor.nextRecoveryAttemptDate()
+        tunnelStatus.isNetworkReachable = isNetworkReachable
+        tunnelStatus.reconnectAttemptDate = tunnelMonitor.nextRecoveryAttemptDate()
     }
 
     // MARK: - Private

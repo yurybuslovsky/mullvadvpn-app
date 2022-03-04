@@ -208,10 +208,10 @@ class ConnectViewController: UIViewController, MKMapViewDelegate, RootContainmen
 
     private func updateTunnelConnectionInfo() {
         switch tunnelState {
-        case .connecting(let tunnelRelay, _):
+        case .connecting(let tunnelRelay):
             setTunnelRelay(tunnelRelay)
 
-        case .connected(let tunnelRelay), .reconnecting(let tunnelRelay, _):
+        case .connected(let tunnelRelay), .reconnecting(let tunnelRelay):
             setTunnelRelay(tunnelRelay)
 
         case .disconnected, .disconnecting, .pendingReconnect:
@@ -274,14 +274,14 @@ class ConnectViewController: UIViewController, MKMapViewDelegate, RootContainmen
 
     private func updateLocation(animated: Bool) {
         switch tunnelState {
-        case .connecting(let tunnelRelay, _):
+        case .connecting(let tunnelRelay):
             if let tunnelRelay = tunnelRelay {
                 setLocation(coordinate: tunnelRelay.location.geoCoordinate, animated: animated)
             } else {
                 unsetLocation(animated: animated)
             }
 
-        case .connected(let tunnelRelay), .reconnecting(let tunnelRelay, _):
+        case .connected(let tunnelRelay), .reconnecting(let tunnelRelay):
             setLocation(coordinate: tunnelRelay.location.geoCoordinate, animated: animated)
 
         case .disconnected, .disconnecting, .pendingReconnect:
@@ -551,7 +551,7 @@ private extension TunnelState {
                 comment: ""
             )
 
-        case .reconnecting(let tunnelInfo, _):
+        case .reconnecting(let tunnelInfo):
             return String(
                 format: NSLocalizedString(
                     "TUNNEL_STATE_RECONNECTING_ACCESSIBILITY_LABEL",

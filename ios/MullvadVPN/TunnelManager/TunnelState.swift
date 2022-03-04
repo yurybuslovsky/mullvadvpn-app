@@ -8,13 +8,58 @@
 
 import Foundation
 
-/// A enum that describes the tunnel state
+/// A struct describing the tunnel status.
+struct TunnelStatus: Equatable, CustomStringConvertible {
+    /// Whether netowork is reachable.
+    var isNetworkReachable: Bool
+
+    /// When the next reconnect attempt will take place.
+    var reconnectAttemptDate: Date?
+
+    /// Tunnel state.
+    var state: TunnelState
+
+    var description: String {
+        var s = "\(state), network "
+
+        if isNetworkReachable {
+            s += "reachable"
+        } else {
+            s += "unreachable"
+        }
+
+        if let reconnectAttemptDate = reconnectAttemptDate {
+            s += ", next reconnect on \(reconnectAttemptDate.logFormatDate())"
+        }
+
+        return s
+    }
+
+    /// Updates the tunnel status from packet tunnel status, mapping relay to tunnel state.
+    mutating func update(from packetTunnelStatus: PacketTunnelStatus, mappingRelayToState mapper: (PacketTunnelRelay?) -> TunnelState?) {
+        isNetworkReachable = packetTunnelStatus.isNetworkReachable
+        reconnectAttemptDate = packetTunnelStatus.reconnectAttemptDate
+
+        if let newState = mapper(packetTunnelStatus.tunnelRelay) {
+            state = newState
+        }
+    }
+
+    /// Resets all fields to their defaults and assigns the next tunnel state.
+    mutating func reset(to newState: TunnelState) {
+        isNetworkReachable = true
+        reconnectAttemptDate = nil
+        state = newState
+    }
+}
+
+/// An enum that describes the tunnel state.
 enum TunnelState: Equatable, CustomStringConvertible {
     /// Pending reconnect after disconnect.
     case pendingReconnect
 
     /// Connecting the tunnel.
-    case connecting(_ relay: PacketTunnelRelay?, _ reconnectAttemptDate: Date?)
+    case connecting(_ relay: PacketTunnelRelay?)
 
     /// Connected the tunnel
     case connected(PacketTunnelRelay)
@@ -27,13 +72,13 @@ enum TunnelState: Equatable, CustomStringConvertible {
 
     /// Reconnecting the tunnel. Normally this state appears in response to changing the
     /// relay constraints and asking the running tunnel to reload the configuration.
-    case reconnecting(_ relay: PacketTunnelRelay, _ reconnectAttemptDate: Date?)
+    case reconnecting(_ relay: PacketTunnelRelay)
 
     var description: String {
         switch self {
         case .pendingReconnect:
             return "pending reconnect after disconnect"
-        case .connecting(let tunnelRelay, _):
+        case .connecting(let tunnelRelay):
             if let tunnelRelay = tunnelRelay {
                 return "connecting to \(tunnelRelay.hostname)"
             } else {
@@ -45,7 +90,7 @@ enum TunnelState: Equatable, CustomStringConvertible {
             return "disconnecting and then \(actionAfterDisconnect)"
         case .disconnected:
             return "disconnected"
-        case .reconnecting(let tunnelRelay, _):
+        case .reconnecting(let tunnelRelay):
             return "reconnecting to \(tunnelRelay.hostname)"
         }
     }

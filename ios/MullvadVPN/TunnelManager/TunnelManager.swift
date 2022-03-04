@@ -14,8 +14,12 @@ import Logging
 import class WireGuardKit.PublicKey
 
 struct TunnelManagerConfiguration {
-    /// Relay poll interval when the next reconnect date is not known.
-    let relayPollInterval: TimeInterval = 2
+    /// Tunnel status poll interval when the next reconnect date is not known and network is
+    /// reachable.
+    let networkReachableTunnelStatusPollInterval: TimeInterval = 2
+
+    /// Tunnel status poll interval when network is unreachable.
+    let networkUnreachableTunnelStatusPollInterval: TimeInterval = 15
 
     /// Private key rotation interval (in seconds).
     let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
@@ -58,14 +62,14 @@ final class TunnelManager: TunnelManagerStateDelegate {
     private var privateKeyRotationTimer: DispatchSourceTimer?
     private var isRunningPeriodicPrivateKeyRotation = false
 
-    private var pollRelayWork: DispatchWorkItem?
+    private var tunnelStatusPollWork: DispatchWorkItem?
 
     var tunnelInfo: TunnelInfo? {
         return state.tunnelInfo
     }
 
     var tunnelState: TunnelState {
-        return state.tunnelState
+        return state.tunnelStatus.state
     }
 
     private init(restClient: REST.Client) {
@@ -267,10 +271,10 @@ final class TunnelManager: TunnelManagerStateDelegate {
                 self.logger.error(chainedError: error, message: "Failed to reconnect the tunnel.")
             }
 
-            // Refresh tunnel state since reasserting may not be lowered until the tunnel is fully
+            // Refresh tunnel status since reasserting may not be lowered until the tunnel is fully
             // connected.
-            self.logger.debug("Refresh tunnel state due to reconnect.")
-            self.refreshTunnelState()
+            self.logger.debug("Refresh tunnel status due to reconnect.")
+            self.refreshTunnelStatus()
 
             DispatchQueue.main.async {
                 completionHandler?()
@@ -463,23 +467,23 @@ final class TunnelManager: TunnelManagerStateDelegate {
         }
     }
 
-    func tunnelManagerState(_ state: TunnelManager.State, didChangeTunnelState newTunnelState: TunnelState) {
-        logger.info("Set tunnel state: \(newTunnelState).")
+    func tunnelManagerState(_ state: TunnelManager.State, didChangeTunnelStatus newTunnelStatus: TunnelStatus) {
+        logger.info("Status: \(newTunnelStatus).")
 
-        switch newTunnelState {
-        case .connecting(_, let reconnectDate), .reconnecting(_, let reconnectDate):
+        switch newTunnelStatus.state {
+        case .connecting, .reconnecting:
             // Start polling tunnel status to keep the relay information up to date
             // while the tunnel process is trying to connect.
-            startPollingRelay(reconnectDate: reconnectDate)
+            startPollingTunnelStatus(isNetworkReachable: newTunnelStatus.isNetworkReachable, reconnectDate: newTunnelStatus.reconnectAttemptDate)
 
         case .pendingReconnect, .connected, .disconnecting, .disconnected:
             // Stop polling tunnel status once connection moved to final state.
-            cancelPollingRelay()
+            cancelPollingTunnelStatus()
         }
 
         DispatchQueue.main.async {
             self.observerList.forEach { (observer) in
-                observer.tunnelManager(self, didUpdateTunnelState: newTunnelState)
+                observer.tunnelManager(self, didUpdateTunnelState: newTunnelStatus.state)
             }
         }
     }
@@ -496,8 +500,8 @@ final class TunnelManager: TunnelManagerStateDelegate {
 
         // Update the existing state
         if shouldRefreshTunnelState {
-            logger.debug("Refresh tunnel state for new tunnel.")
-            refreshTunnelState()
+            logger.debug("Refresh tunnel status for new tunnel.")
+            refreshTunnelStatus()
         }
     }
 
@@ -510,7 +514,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
             guard let self = self else { return }
 
             self.logger.debug("VPN connection status changed to \(status).")
-            self.updateTunnelState(status)
+            self.updateTunnelStatus(status)
         }
     }
 
@@ -519,18 +523,18 @@ final class TunnelManager: TunnelManagerStateDelegate {
         statusObserver = nil
     }
 
-    private func refreshTunnelState() {
+    private func refreshTunnelStatus() {
         dispatchPrecondition(condition: .onQueue(stateQueue))
 
         if let connectionStatus = self.state.tunnel?.status {
-            updateTunnelState(connectionStatus)
+            updateTunnelStatus(connectionStatus)
         }
     }
 
-    /// Update `TunnelState` from `NEVPNStatus`.
-    /// Collects the `TunnelConnectionInfo` from the tunnel via IPC if needed before assigning
-    /// the `tunnelState`.
-    private func updateTunnelState(_ connectionStatus: NEVPNStatus) {
+    /// Update `TunnelStatus` from `NEVPNStatus`.
+    /// Collects the `PacketTunnelStatus` from the tunnel via IPC if needed before assigning
+    /// the `tunnelStatus`.
+    private func updateTunnelStatus(_ connectionStatus: NEVPNStatus) {
         dispatchPrecondition(condition: .onQueue(stateQueue))
 
         let operation = MapConnectionStatusOperation(queue: stateQueue, state: state, connectionStatus: connectionStatus) { [weak self] in
@@ -552,8 +556,8 @@ final class TunnelManager: TunnelManagerStateDelegate {
 
     @objc private func applicationDidBecomeActive() {
         stateQueue.async {
-            self.logger.debug("Refresh tunnel state due to application becoming active.")
-            self.refreshTunnelState()
+            self.logger.debug("Refresh tunnel status due to application becoming active.")
+            self.refreshTunnelStatus()
         }
     }
 
@@ -625,39 +629,57 @@ final class TunnelManager: TunnelManagerStateDelegate {
         operationQueue.addOperation(operation)
     }
 
+    // MARK: - Tunnel status polling.
 
+    private func nextDateForPollingTunnelStatus(isNetworkReachable: Bool, reconnectDate: Date?) -> Date {
+        // When network is unreachable, poll the tunnel status using long intervals because packet
+        // tunnel will not attempt to recover connection until network is back up.
+        guard isNetworkReachable else {
+            return Date(timeIntervalSinceNow: configuration.networkUnreachableTunnelStatusPollInterval)
 
-    // MARK: - Tunnel relay polling.
-
-    private func startPollingRelay(reconnectDate: Date?) {
-        let pollDate: Date
-        if let reconnectDate = reconnectDate, reconnectDate > Date() {
-            pollDate = reconnectDate
-        } else {
-            pollDate = Date(timeIntervalSinceNow: configuration.relayPollInterval)
         }
+
+        // When network is reachable, use reconnect date passed by packet tunnel to schedule
+        // the next tunnel status update.
+        if let reconnectDate = reconnectDate, reconnectDate > Date() {
+            return reconnectDate
+        } else {
+            // Do quick polling when reconnect date is either unavailable or stale to refresh
+            // the tunnel status.
+            return Date(timeIntervalSinceNow: configuration.networkReachableTunnelStatusPollInterval)
+        }
+    }
+
+    private func startPollingTunnelStatus(isNetworkReachable: Bool, reconnectDate: Date?) {
+        // Compute date for polling tunnel status.
+        let pollDate = nextDateForPollingTunnelStatus(isNetworkReachable: isNetworkReachable, reconnectDate: reconnectDate)
 
         logger.debug("Poll relay at \(pollDate.logFormatDate()).")
 
+        // Create work to refresh the tunnel.
         let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
 
-            self.logger.debug("Refresh tunnel state (poll).")
-            self.refreshTunnelState()
+            self.logger.debug("Refresh tunnel status (poll).")
+            self.refreshTunnelStatus()
         }
 
+        // Schedule delayed work.
         stateQueue.asyncAfter(wallDeadline: .now() + pollDate.timeIntervalSinceNow, execute: workItem)
 
-        pollRelayWork?.cancel()
-        pollRelayWork = workItem
+        // Cancel already scheduled work.
+        tunnelStatusPollWork?.cancel()
+
+        // Store new work.
+        tunnelStatusPollWork = workItem
     }
 
-    private func cancelPollingRelay() {
-        if let pollRelayWork = pollRelayWork {
-            logger.debug("Cancel relay polling.")
+    private func cancelPollingTunnelStatus() {
+        if let pollRelayWork = tunnelStatusPollWork {
+            logger.debug("Cancel tunnel status polling.")
 
             pollRelayWork.cancel()
-            self.pollRelayWork = nil
+            self.tunnelStatusPollWork = nil
         }
     }
 
