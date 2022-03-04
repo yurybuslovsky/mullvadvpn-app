@@ -13,11 +13,11 @@ enum TunnelState: Equatable, CustomStringConvertible {
     /// Pending reconnect after disconnect.
     case pendingReconnect
 
-    /// Connecting the tunnel. Contains the pending action carried over from disconnected state.
-    case connecting(TunnelConnectionInfo?)
+    /// Connecting the tunnel.
+    case connecting(_ relay: PacketTunnelRelay?, _ reconnectAttemptDate: Date?)
 
     /// Connected the tunnel
-    case connected(TunnelConnectionInfo)
+    case connected(PacketTunnelRelay)
 
     /// Disconnecting the tunnel
     case disconnecting(ActionAfterDisconnect)
@@ -27,26 +27,26 @@ enum TunnelState: Equatable, CustomStringConvertible {
 
     /// Reconnecting the tunnel. Normally this state appears in response to changing the
     /// relay constraints and asking the running tunnel to reload the configuration.
-    case reconnecting(TunnelConnectionInfo)
+    case reconnecting(_ relay: PacketTunnelRelay, _ reconnectAttemptDate: Date?)
 
     var description: String {
         switch self {
         case .pendingReconnect:
             return "pending reconnect after disconnect"
-        case .connecting(let connectionInfo):
-            if let connectionInfo = connectionInfo {
-                return "connecting to \(connectionInfo.hostname)"
+        case .connecting(let tunnelRelay, _):
+            if let tunnelRelay = tunnelRelay {
+                return "connecting to \(tunnelRelay.hostname)"
             } else {
                 return "connecting, fetching relay"
             }
-        case .connected(let connectionInfo):
-            return "connected to \(connectionInfo.hostname)"
+        case .connected(let tunnelRelay):
+            return "connected to \(tunnelRelay.hostname)"
         case .disconnecting(let actionAfterDisconnect):
             return "disconnecting and then \(actionAfterDisconnect)"
         case .disconnected:
             return "disconnected"
-        case .reconnecting(let connectionInfo):
-            return "reconnecting to \(connectionInfo.hostname)"
+        case .reconnecting(let tunnelRelay, _):
+            return "reconnecting to \(tunnelRelay.hostname)"
         }
     }
 }

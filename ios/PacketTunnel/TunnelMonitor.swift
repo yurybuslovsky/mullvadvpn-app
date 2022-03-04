@@ -17,6 +17,9 @@ protocol TunnelMonitorDelegate: AnyObject {
 
     /// Invoked when tunnel monitor determined that connection attempt has failed.
     func tunnelMonitorDelegateShouldHandleConnectionRecovery(_ tunnelMonitor: TunnelMonitor)
+
+    /// Invoked when network reachability status changes.
+    func tunnelMonitor(_ tunnelMonitor: TunnelMonitor, networkReachabilityStatusDidChange isNetworkReachable: Bool)
 }
 
 struct TunnelMonitorConfiguration {
@@ -44,7 +47,7 @@ class TunnelMonitor {
     private var pinger: Pinger?
     private var pathMonitor: NWPathMonitor?
     private var networkBytesReceived: UInt64 = 0
-    private var lastAttemptDate = Date()
+    private var lastAttemptDate: Date?
     private var lastError: Pinger.Error?
     private var isPinging = false
 
@@ -86,6 +89,18 @@ class TunnelMonitor {
         }
     }
 
+    /// Returns the date when the next recovery attempt will take place, otherwise nil.
+    func nextRecoveryAttemptDate() -> Date? {
+        return internalQueue.sync {
+            return lastAttemptDate.map { nextRecoveryAttemptDate(from: $0) }
+        }
+    }
+
+    /// Returns the date when the next recovery attempt will take place relative to the given date.
+    func nextRecoveryAttemptDate(from date: Date) -> Date {
+        return date.addingTimeInterval(configuration.connectionTimeout)
+    }
+
     private func startNoQueue(address pingAddress: IPv4Address) {
         if address == nil {
             logger.debug("Start tunnel monitor with address: \(pingAddress).")
@@ -116,6 +131,7 @@ class TunnelMonitor {
         }
 
         address = nil
+        lastAttemptDate = nil
         lastError = nil
 
         pathMonitor?.cancel()
@@ -201,18 +217,21 @@ class TunnelMonitor {
 
             // Stop the tunnel monitor.
             stopNoQueue(forRestart: false)
-        } else if Date().timeIntervalSince(lastAttemptDate) >= configuration.connectionTimeout {
-            // Tell delegate to attempt the connection recovery.
-            delegateQueue.async {
-                self.delegate?.tunnelMonitorDelegateShouldHandleConnectionRecovery(self)
-            }
 
-            // Reset the last recovery attempt date so that we periodically notify the delegate
-            // to perform the recovery.
+            return
+        }
+
+        if let date = lastAttemptDate, nextRecoveryAttemptDate(from: date) <= Date() {
+            // Reset the last recovery attempt date.
             lastAttemptDate = Date()
 
             // Reset last error.
             lastError = nil
+
+            // Tell delegate to attempt the connection recovery.
+            delegateQueue.async {
+                self.delegate?.tunnelMonitorDelegateShouldHandleConnectionRecovery(self)
+            }
         }
     }
 
@@ -221,13 +240,23 @@ class TunnelMonitor {
             return
         }
 
-        switch (isNetworkPathReachable(networkPath), isPinging) {
+        let isNetworkReachable = isNetworkPathReachable(networkPath)
+
+        switch (isNetworkReachable, isPinging) {
         case (true, false):
             logger.debug("Network is reachable. Starting to ping.")
 
             switch startPinging(address: address) {
             case .success:
+                // Reset the last recovery attempt date.
+                lastAttemptDate = Date()
+
+                // Start WG stats timer.
                 setWgStatsTimer()
+
+                delegateQueue.async {
+                    self.delegate?.tunnelMonitor(self, networkReachabilityStatusDidChange: isNetworkReachable)
+                }
 
             case .failure(let error):
                 if error != lastError {
@@ -238,8 +267,17 @@ class TunnelMonitor {
 
         case (false, true):
             logger.debug("Network is unreachable. Stop pinging and wait...")
+
+            // Cancel timers and ping.
             cancelWgStatsTimer()
             stopPinging()
+
+            // Reset the last recovery attempt date.
+            lastAttemptDate = nil
+
+            delegateQueue.async {
+                self.delegate?.tunnelMonitor(self, networkReachabilityStatusDidChange: isNetworkReachable)
+            }
 
         default:
             break

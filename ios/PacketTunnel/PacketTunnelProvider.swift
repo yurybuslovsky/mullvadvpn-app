@@ -41,16 +41,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     /// Tunnel monitor.
     private var tunnelMonitor: TunnelMonitor!
 
-    /// Tunnel connection info.
-    private var tunnelConnectionInfo: TunnelConnectionInfo? {
-        didSet {
-            if let tunnelConnectionInfo = tunnelConnectionInfo {
-                self.providerLogger.debug("Set tunnel relay to \(tunnelConnectionInfo.hostname).")
-            } else {
-                self.providerLogger.debug("Unset tunnel relay.")
-            }
-        }
-    }
+    /// Tunnel status.
+    private var tunnelStatus = PacketTunnelStatus(
+        isNetworkReachable: true,
+        reconnectAttemptDate: nil,
+        tunnelRelay: nil
+    )
 
     override init() {
         let pid = ProcessInfo.processInfo.processIdentifier
@@ -85,7 +81,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
             switch appSelectorResult {
             case .some(let selectorResult):
-                providerLogger.debug("Start the tunnel via app, connect to \(selectorResult.tunnelConnectionInfo.hostname).")
+                providerLogger.debug("Start the tunnel via app, connect to \(selectorResult.relay.hostname).")
 
             case .none:
                 if tunnelOptions.isOnDemand() {
@@ -114,9 +110,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
             return
         }
 
-        // Set tunnel connection info.
+        // Set tunnel status.
         dispatchQueue.async {
-            self.tunnelConnectionInfo = tunnelConfiguration.selectorResult.tunnelConnectionInfo
+            let tunnelRelay = tunnelConfiguration.selectorResult.packetTunnelRelay
+            self.tunnelStatus.tunnelRelay = tunnelRelay
+            self.providerLogger.debug("Set tunnel relay to \(tunnelRelay.hostname).")
         }
 
         // Start tunnel.
@@ -143,6 +141,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
                     // Start tunnel monitor.
                     let gatewayAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
                     self.tunnelMonitor.start(address: gatewayAddress)
+
+                    // Set next recovery attempt date.
+                    self.tunnelStatus.reconnectAttemptDate = self.tunnelMonitor.nextRecoveryAttemptDate()
                 }
             }
         }
@@ -203,10 +204,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
                 completionHandler?(nil)
 
-            case .tunnelConnectionInfo:
+            case .getTunnelStatus:
                 var response: Data?
                 do {
-                    response = try TunnelIPC.Coding.encodeResponse(self.tunnelConnectionInfo)
+                    response = try TunnelIPC.Coding.encodeResponse(self.tunnelStatus)
                 } catch {
                     self.providerLogger.error(chainedError: AnyChainedError(error), message: "Failed to encode the app message response for \(request)")
                 }
@@ -231,6 +232,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
         dispatchPrecondition(condition: .onQueue(dispatchQueue))
 
         providerLogger.debug("Connection established.")
+
+        tunnelStatus.reconnectAttemptDate = nil
 
         startTunnelCompletionHandler?(nil)
         startTunnelCompletionHandler = nil
@@ -272,8 +275,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
             return
         }
 
-        // Set tunnel connection info.
-        self.tunnelConnectionInfo = tunnelConfiguration.selectorResult.tunnelConnectionInfo
+        // Update tunnel status.
+        let tunnelRelay = tunnelConfiguration.selectorResult.packetTunnelRelay
+        tunnelStatus.tunnelRelay = tunnelRelay
+        tunnelStatus.reconnectAttemptDate = tunnelMonitor.nextRecoveryAttemptDate()
+        providerLogger.debug("Set tunnel relay to \(tunnelRelay.hostname).")
 
         // Update WireGuard configuration.
         adapter.update(tunnelConfiguration: tunnelConfiguration.wgTunnelConfig) { error in
@@ -283,6 +289,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
                 }
             }
         }
+    }
+
+    func tunnelMonitor(_ tunnelMonitor: TunnelMonitor, networkReachabilityStatusDidChange isNetworkReachable: Bool) {
+        self.tunnelStatus.isNetworkReachable = isNetworkReachable
+        self.tunnelStatus.reconnectAttemptDate = tunnelMonitor.nextRecoveryAttemptDate()
     }
 
     // MARK: - Private
@@ -335,10 +346,14 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
             return
         }
 
-        // Set tunnel connection info.
-        let tunnelConnectionInfo = tunnelConfiguration.selectorResult.tunnelConnectionInfo
-        let oldTunnelConnectionInfo = self.tunnelConnectionInfo
-        self.tunnelConnectionInfo = tunnelConnectionInfo
+        // Copy old relay.
+        let oldTunnelRelay = tunnelStatus.tunnelRelay
+        let newTunnelRelay = tunnelConfiguration.selectorResult.packetTunnelRelay
+
+        // Update tunnel status.
+        tunnelStatus.tunnelRelay = newTunnelRelay
+        tunnelStatus.reconnectAttemptDate = tunnelMonitor.nextRecoveryAttemptDate(from: Date())
+        providerLogger.debug("Set tunnel relay to \(newTunnelRelay.hostname).")
 
         // Raise reasserting flag, but only if tunnel has already moved to connected state once.
         // Otherwise keep the app in connecting state until it manages to establish the very first
@@ -355,8 +370,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
                 // Call completion handler immediately on error to update adapter configuration.
                 if let error = error {
-                    // Revert to previously used tunnel connection info.
-                    self.tunnelConnectionInfo = oldTunnelConnectionInfo
+                    // Revert to previously used tunnel relay.
+                    self.tunnelStatus.tunnelRelay = oldTunnelRelay
+                    self.providerLogger.debug("Reset tunnel relay to \(oldTunnelRelay?.hostname ?? "none").")
 
                     // Lower the reasserting flag.
                     if self.isConnected {
@@ -382,6 +398,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
                     // Restart tunnel monitor.
                     let gatewayAddress = tunnelConfiguration.selectorResult.endpoint.ipv4Gateway
                     self.tunnelMonitor.start(address: gatewayAddress)
+
+                    /// Update tunnel status.
+                    self.tunnelStatus.reconnectAttemptDate = self.tunnelMonitor.nextRecoveryAttemptDate()
                 }
             }
         }
