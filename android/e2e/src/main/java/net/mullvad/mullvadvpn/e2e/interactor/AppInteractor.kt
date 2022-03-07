@@ -7,17 +7,19 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import net.mullvad.mullvadvpn.e2e.constant.APP_LAUNCH_TIMEOUT
 import net.mullvad.mullvadvpn.e2e.constant.MULLVAD_PACKAGE
+import net.mullvad.mullvadvpn.e2e.constant.SETTINGS_COG_ID
+import net.mullvad.mullvadvpn.e2e.extension.findObjectWithTimeout
 
 class AppInteractor(
     private val device: UiDevice,
     private val targetContext: Context
 ) {
-    fun launch(timeout: Long = APP_LAUNCH_TIMEOUT) {
+    fun launch() {
         device.pressHome()
         // Wait for launcher
         device.wait(
             Until.hasObject(By.pkg(device.launcherPackageName).depth(0)),
-            timeout
+            APP_LAUNCH_TIMEOUT
         )
         val intent =
             targetContext.packageManager.getLaunchIntentForPackage(MULLVAD_PACKAGE)?.apply {
@@ -27,7 +29,15 @@ class AppInteractor(
         targetContext.startActivity(intent)
         device.wait(
             Until.hasObject(By.pkg(MULLVAD_PACKAGE).depth(0)),
-            timeout
+            APP_LAUNCH_TIMEOUT
         )
+    }
+
+    fun clickSettingsCog() {
+        device.findObjectWithTimeout(By.res(SETTINGS_COG_ID)).click()
+    }
+
+    fun clickListItemByText(text: String) {
+        device.findObjectWithTimeout(By.text(text)).click()
     }
 }
