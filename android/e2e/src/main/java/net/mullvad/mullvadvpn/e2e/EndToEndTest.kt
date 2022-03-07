@@ -7,6 +7,7 @@ import androidx.test.uiautomator.UiDevice
 import net.mullvad.mullvadvpn.e2e.extension.testAccountToken
 import net.mullvad.mullvadvpn.e2e.interactor.AppInteractor
 import net.mullvad.mullvadvpn.e2e.interactor.MullvadAccountInteractor
+import net.mullvad.mullvadvpn.e2e.interactor.WebViewInteractor
 import net.mullvad.mullvadvpn.e2e.misc.ScreenshotTakingRule
 import net.mullvad.mullvadvpn.e2e.misc.SimpleMullvadHttpClient
 import org.junit.Before
@@ -25,6 +26,7 @@ abstract class EndToEndTest {
     lateinit var testAccountToken: String
     lateinit var app: AppInteractor
     lateinit var account: MullvadAccountInteractor
+    lateinit var web: WebViewInteractor
 
     @Before
     fun setup() {
@@ -41,6 +43,11 @@ abstract class EndToEndTest {
         account = MullvadAccountInteractor(
             SimpleMullvadHttpClient(targetContext),
             testAccountToken
+        )
+
+        web = WebViewInteractor(
+            targetContext,
+            device
         )
 
         account.cleanupAccount()

@@ -10,6 +10,8 @@ import net.mullvad.mullvadvpn.e2e.constant.APP_LAUNCH_TIMEOUT
 import net.mullvad.mullvadvpn.e2e.constant.LOGIN_TIMEOUT
 import net.mullvad.mullvadvpn.e2e.constant.MULLVAD_PACKAGE
 import net.mullvad.mullvadvpn.e2e.constant.SETTINGS_COG_ID
+import net.mullvad.mullvadvpn.e2e.constant.TUNNEL_INFO_ID
+import net.mullvad.mullvadvpn.e2e.constant.TUNNEL_OUT_ADDRESS_ID
 import net.mullvad.mullvadvpn.e2e.extension.findObjectWithTimeout
 
 class AppInteractor(
@@ -47,6 +49,11 @@ class AppInteractor(
         device.findObjectWithTimeout(By.text("UNSECURED CONNECTION"), LOGIN_TIMEOUT)
     }
 
+    fun extractIpAddress(): String {
+        device.findObjectWithTimeout(By.res(TUNNEL_INFO_ID)).click()
+        return device.findObjectWithTimeout(By.res(TUNNEL_OUT_ADDRESS_ID)).text.extractIpAddress()
+    }
+
     fun launchAndEnsureLoggedIn(accountToken: String = testAccountToken) {
         launch()
         attemptLogin(accountToken)
@@ -63,5 +70,9 @@ class AppInteractor(
 
     fun clickActionButtonByText(text: String) {
         device.findObjectWithTimeout(By.text(text)).click()
+    }
+
+    private fun String.extractIpAddress(): String {
+        return split("  ")[1].split(" ")[0]
     }
 }
