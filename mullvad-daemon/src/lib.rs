@@ -1706,26 +1706,28 @@ where
 
     async fn on_get_device(&mut self, tx: ResponseTx<Option<DeviceConfig>, Error>) {
         // Make sure the device is updated
-        match self.account_manager.validate_device().await {
-            Ok(_) | Err(device::Error::NoDevice) => (),
-            Err(error) => {
-                log::error!(
-                    "{}",
-                    error.display_chain_with_msg("Failed to update device data")
-                );
+        let account_manager = self.account_manager.clone();
+        tokio::spawn(async move {
+            match account_manager.validate_device().await {
+                Ok(_) | Err(device::Error::NoDevice) => (),
+                Err(error) => {
+                    log::error!(
+                        "{}",
+                        error.display_chain_with_msg("Failed to update device data")
+                    );
+                }
             }
-        }
 
-        Self::oneshot_send(
-            tx,
-            Ok(self
-                .account_manager
-                .data()
-                .await
-                .unwrap_or(None)
-                .map(DeviceConfig::from)),
-            "get_device response",
-        );
+            Self::oneshot_send(
+                tx,
+                Ok(account_manager
+                    .data()
+                    .await
+                    .unwrap_or(None)
+                    .map(DeviceConfig::from)),
+                "get_device response",
+            );
+        });
     }
 
     async fn on_list_devices(&mut self, tx: ResponseTx<Vec<Device>, Error>, token: AccountToken) {
