@@ -7,6 +7,7 @@ import androidx.test.uiautomator.UiDevice
 import net.mullvad.mullvadvpn.e2e.extension.testAccountToken
 import net.mullvad.mullvadvpn.e2e.interactor.AppInteractor
 import net.mullvad.mullvadvpn.e2e.interactor.MullvadAccountInteractor
+import net.mullvad.mullvadvpn.e2e.interactor.NotificationStackInteractor
 import net.mullvad.mullvadvpn.e2e.interactor.WebViewInteractor
 import net.mullvad.mullvadvpn.e2e.misc.ScreenshotTakingRule
 import net.mullvad.mullvadvpn.e2e.misc.SimpleMullvadHttpClient
@@ -26,6 +27,7 @@ abstract class EndToEndTest {
     lateinit var testAccountToken: String
     lateinit var app: AppInteractor
     lateinit var account: MullvadAccountInteractor
+    lateinit var notificationStack: NotificationStackInteractor
     lateinit var web: WebViewInteractor
 
     @Before
@@ -47,6 +49,10 @@ abstract class EndToEndTest {
 
         web = WebViewInteractor(
             targetContext,
+            device
+        )
+
+        notificationStack = NotificationStackInteractor(
             device
         )
 
