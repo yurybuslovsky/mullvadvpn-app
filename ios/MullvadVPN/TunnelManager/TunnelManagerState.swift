@@ -27,7 +27,7 @@ extension TunnelManager {
         private var _tunnelObject: Tunnel?
         private var _tunnelStatus = TunnelStatus(
             isNetworkReachable: false,
-            startMonitoringDate: nil,
+            connectingDate: nil,
             state: .disconnected
         )
 

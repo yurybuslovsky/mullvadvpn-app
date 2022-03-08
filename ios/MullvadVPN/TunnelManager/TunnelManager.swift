@@ -13,25 +13,32 @@ import UIKit
 import Logging
 import class WireGuardKit.PublicKey
 
-struct TunnelManagerConfiguration {
-    /// Delay used before starting to poll the tunnel status (in seconds).
-    let tunnelStatusPollDelay: TimeInterval = 2
+enum TunnelManagerConfiguration {
+    /// Delay used before starting to quickly poll the tunnel (in seconds).
+    /// Usually when the tunnel is either starting or when reconnecting for a brief moment, until
+    /// the tunnel broadcasts the connecting date which is later used to synchronize polling.
+    static let tunnelStatusQuickPollDelay: TimeInterval = 1
 
-    /// Interval between attempts to poll the tunnel status (in seconds).
-    let tunnelStatusPollInterval: TimeInterval = 5
+    /// Poll interval used when connecting date is unknown (in seconds).
+    static let tunnelStatusQuickPollInterval: TimeInterval = 3
+
+    /// Delay used for when connecting date is known (in seconds).
+    /// Since both GUI and packet tunnel run timers, this accounts for some leeway.
+    static let tunnelStatusLongPollDelay: TimeInterval = 0.25
+
+    /// Poll interval used for when connecting date is known (in seconds).
+    static let tunnelStatusLongPollInterval = TunnelMonitorConfiguration.connectionTimeout
 
     /// Private key rotation interval (in seconds).
-    let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
+    static let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
 
     /// Private key rotation retry interval (in seconds).
-    let privateKeyRotationFailureRetryInterval: TimeInterval = 60 * 15
+    static let privateKeyRotationFailureRetryInterval: TimeInterval = 60 * 15
 }
 
 /// A class that provides a convenient interface for VPN tunnels configuration, manipulation and
 /// monitoring.
 final class TunnelManager: TunnelManagerStateDelegate {
-    private let configuration = TunnelManagerConfiguration()
-
     /// Operation categories
     private enum OperationCategory {
         static let manageTunnelProvider = "TunnelManager.manageTunnelProvider"
@@ -63,7 +70,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
 
     private var tunnelStatusPollTimer: DispatchSourceTimer?
     private var isPolling = false
-    private var lastStartMonitoringDate: Date?
+    private var lastConnectingDate: Date?
 
     var tunnelInfo: TunnelInfo? {
         return state.tunnelInfo
@@ -120,7 +127,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
 
         if let tunnelInfo = self.state.tunnelInfo {
             let creationDate = tunnelInfo.tunnelSettings.interface.privateKey.creationDate
-            let scheduleDate = Date(timeInterval: configuration.privateKeyRotationInterval, since: creationDate)
+            let scheduleDate = Date(timeInterval: TunnelManagerConfiguration.privateKeyRotationInterval, since: creationDate)
 
             schedulePrivateKeyRotationTimer(scheduleDate)
         } else {
@@ -376,7 +383,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
             queue: stateQueue,
             state: state,
             restClient: restClient,
-            rotationInterval: configuration.privateKeyRotationInterval) { [weak self] completion in
+            rotationInterval: TunnelManagerConfiguration.privateKeyRotationInterval) { [weak self] completion in
                 guard let self = self else { return }
 
                 dispatchPrecondition(condition: .onQueue(self.stateQueue))
@@ -475,7 +482,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
         case .connecting, .reconnecting:
             // Start polling tunnel status to keep the relay information up to date
             // while the tunnel process is trying to connect.
-            startPollingTunnelStatus(startReconnectDate: newTunnelStatus.startMonitoringDate)
+            startPollingTunnelStatus(connectingDate: newTunnelStatus.connectingDate)
 
         case .pendingReconnect, .connected, .disconnecting, .disconnected:
             // Stop polling tunnel status once connection moved to final state.
@@ -632,30 +639,46 @@ final class TunnelManager: TunnelManagerStateDelegate {
 
     // MARK: - Tunnel status polling.
 
-    private func computeNextPollDate(startReconnectDate: Date?) -> Date {
-        // Compute the next date for polling relative to when the packet tunnel started
-        // re-establishing connection.
-        if let startReconnectDate = startReconnectDate {
-            let repeatInterval = configuration.tunnelStatusPollInterval
-            let delta = max(0, Date().timeIntervalSince(startReconnectDate))
-            let nextInterval = (floor(delta / repeatInterval) + 1) * repeatInterval
+    private func computeNextPollDateAndRepeatInterval(connectingDate: Date?) -> (Date, TimeInterval) {
+        let delay, repeating: TimeInterval
+        let fireDate: Date
 
-            return startReconnectDate.addingTimeInterval(nextInterval)
+        if let connectingDate = connectingDate {
+            // Compute the schedule date for timer relative to when the packet tunnel started
+            // connecting.
+            delay = TunnelManagerConfiguration.tunnelStatusLongPollDelay
+            repeating = TunnelManagerConfiguration.tunnelStatusLongPollInterval
+
+            // Compute the time elapsed since connecting date.
+            let elapsed = max(0, Date().timeIntervalSince(connectingDate))
+
+            // Compute how many times the timer has fired so far.
+            let fireCount = floor(elapsed / repeating)
+
+            // Compute when the timer will fire next time.
+            let nextDelta = (fireCount + 1) * repeating
+
+            // Compute the fire date adding extra delay to account for leeway.
+            fireDate = connectingDate.addingTimeInterval(nextDelta + delay)
         } else {
-            // Do quick polling when it's not known when the packet tunnel started re-establish
-            // connection.
-            return Date(timeIntervalSinceNow: configuration.tunnelStatusPollDelay)
+            // Do quick polling until it's known when the packet tunnel started connecting.
+            delay = TunnelManagerConfiguration.tunnelStatusQuickPollDelay
+            repeating = TunnelManagerConfiguration.tunnelStatusQuickPollInterval
+
+            fireDate = Date(timeIntervalSinceNow: delay)
         }
+
+        return (fireDate, repeating)
     }
 
-    private func startPollingTunnelStatus(startMonitoringDate: Date?) {
-        guard lastStartMonitoringDate != startMonitoringDate || !isPolling else { return }
+    private func startPollingTunnelStatus(connectingDate: Date?) {
+        guard lastConnectingDate != connectingDate || !isPolling else { return }
 
-        lastStartMonitoringDate = startMonitoringDate
+        lastConnectingDate = connectingDate
         isPolling = true
 
-        let nextDate = computeNextPollDate(startReconnectDate: startMonitoringDate)
-        logger.debug("Start polling tunnel status at \(nextDate.logFormatDate()).")
+        let (fireDate, repeating) = computeNextPollDateAndRepeatInterval(connectingDate: connectingDate)
+        logger.debug("Start polling tunnel status at \(fireDate.logFormatDate()) every \(repeating) second(s).")
 
         let timer = DispatchSource.makeTimerSource(queue: stateQueue)
         timer.setEventHandler { [weak self] in
@@ -666,8 +689,8 @@ final class TunnelManager: TunnelManagerStateDelegate {
         }
 
         timer.schedule(
-            wallDeadline: .now() + nextDate.timeIntervalSinceNow,
-            repeating: configuration.tunnelStatusPollInterval
+            wallDeadline: .now() + fireDate.timeIntervalSinceNow,
+            repeating: repeating
         )
 
         timer.resume()
@@ -683,7 +706,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
 
         tunnelStatusPollTimer?.cancel()
         tunnelStatusPollTimer = nil
-        lastStartMonitoringDate = nil
+        lastConnectingDate = nil
         isPolling = false
     }
 
@@ -733,7 +756,7 @@ extension TunnelManager {
     func scheduleBackgroundTask() -> Result<(), TunnelManager.Error> {
         if let tunnelInfo = self.state.tunnelInfo {
             let creationDate = tunnelInfo.tunnelSettings.interface.privateKey.creationDate
-            let beginDate = Date(timeInterval: configuration.privateKeyRotationInterval, since: creationDate)
+            let beginDate = Date(timeInterval: TunnelManagerConfiguration.privateKeyRotationInterval, since: creationDate)
 
             return submitBackgroundTask(at: beginDate)
         } else {
@@ -799,17 +822,17 @@ extension TunnelManager {
         } else {
             logger.debug("Private key rotation was cancelled")
 
-            return Date(timeIntervalSinceNow: configuration.privateKeyRotationFailureRetryInterval)
+            return Date(timeIntervalSinceNow: TunnelManagerConfiguration.privateKeyRotationFailureRetryInterval)
         }
     }
 
     fileprivate func nextScheduleDate(_ result: KeyRotationResult) -> Date {
         switch result {
         case .finished:
-            return Date(timeIntervalSinceNow: configuration.privateKeyRotationInterval)
+            return Date(timeIntervalSinceNow: TunnelManagerConfiguration.privateKeyRotationInterval)
 
         case .throttled(let lastKeyCreationDate):
-            return Date(timeInterval: configuration.privateKeyRotationInterval, since: lastKeyCreationDate)
+            return Date(timeInterval: TunnelManagerConfiguration.privateKeyRotationInterval, since: lastKeyCreationDate)
         }
     }
 
@@ -824,7 +847,7 @@ extension TunnelManager {
             return nil
 
         default:
-            return Date(timeIntervalSinceNow: configuration.privateKeyRotationFailureRetryInterval)
+            return Date(timeIntervalSinceNow: TunnelManagerConfiguration.privateKeyRotationFailureRetryInterval)
         }
     }
 }

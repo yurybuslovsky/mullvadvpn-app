@@ -160,6 +160,8 @@
 		5860392A26DCE7AB00554C79 /* PromiseCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5860392826DCE7AB00554C79 /* PromiseCompletion.swift */; };
 		5860392B26DCEE6300554C79 /* PromiseCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5860392826DCE7AB00554C79 /* PromiseCompletion.swift */; };
 		5862805422428EF100F5A6E1 /* TranslucentButtonBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5862805322428EF100F5A6E1 /* TranslucentButtonBlurView.swift */; };
+		58655DCE27DA0A5D00911834 /* TunnelMonitorConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58655DCD27DA0A5D00911834 /* TunnelMonitorConfiguration.swift */; };
+		58655DCF27DA0A5D00911834 /* TunnelMonitorConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58655DCD27DA0A5D00911834 /* TunnelMonitorConfiguration.swift */; };
 		5868585524054096000B8131 /* AppButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5868585424054096000B8131 /* AppButton.swift */; };
 		5868BD33261DCD2600E6027F /* CustomSplitViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5868BD32261DCD2600E6027F /* CustomSplitViewController.swift */; };
 		586ADD4723FC13F400CE9E87 /* countries.geo.json in Resources */ = {isa = PBXBuildFile; fileRef = 586ADD4523FC13F400CE9E87 /* countries.geo.json */; };
@@ -464,6 +466,7 @@
 		585DA8AE26B9492500B8C587 /* Promise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Promise.swift; sourceTree = "<group>"; };
 		5860392826DCE7AB00554C79 /* PromiseCompletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromiseCompletion.swift; sourceTree = "<group>"; };
 		5862805322428EF100F5A6E1 /* TranslucentButtonBlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslucentButtonBlurView.swift; sourceTree = "<group>"; };
+		58655DCD27DA0A5D00911834 /* TunnelMonitorConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelMonitorConfiguration.swift; sourceTree = "<group>"; };
 		5866F39B2243B82D00168AE5 /* MullvadVPN.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MullvadVPN.entitlements; sourceTree = "<group>"; };
 		5868585424054096000B8131 /* AppButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppButton.swift; sourceTree = "<group>"; };
 		5868BD32261DCD2600E6027F /* CustomSplitViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSplitViewController.swift; sourceTree = "<group>"; };
@@ -999,8 +1002,9 @@
 				58CE5E7D224146470008646E /* Info.plist */,
 				58CE5E7E224146470008646E /* PacketTunnel.entitlements */,
 				58CE5E7B224146470008646E /* PacketTunnelProvider.swift */,
-				58FC040927B3EE03001C21F0 /* TunnelMonitor.swift */,
 				5838318A27C40A3900000571 /* Pinger.swift */,
+				58FC040927B3EE03001C21F0 /* TunnelMonitor.swift */,
+				58655DCD27DA0A5D00911834 /* TunnelMonitorConfiguration.swift */,
 			);
 			path = PacketTunnel;
 			sourceTree = "<group>";
@@ -1404,6 +1408,7 @@
 				58FB865A26EA214400F188BC /* RelayCacheObserver.swift in Sources */,
 				5806766C27048E3E00C858CB /* AnyOptional.swift in Sources */,
 				58ACF64D26567A5000ACE4B7 /* CustomSwitch.swift in Sources */,
+				58655DCE27DA0A5D00911834 /* TunnelMonitorConfiguration.swift in Sources */,
 				5850367F25A481D800A43E93 /* IPAddressRange+Codable.swift in Sources */,
 				58F2E14C276A61C000A79513 /* ReplaceKeyOperation.swift in Sources */,
 				5871FB96254ADE4E0051A0A4 /* ConsolidatedApplicationLog.swift in Sources */,
@@ -1590,6 +1595,7 @@
 				5815039824D6ECAE00C9C50E /* CustomFormatLogHandler.swift in Sources */,
 				5840250522B11AB700E4CFEC /* MullvadEndpoint.swift in Sources */,
 				58906DE02445C7A5002F0673 /* NEProviderStopReason+Debug.swift in Sources */,
+				58655DCF27DA0A5D00911834 /* TunnelMonitorConfiguration.swift in Sources */,
 				5815039E24D6ECE600C9C50E /* TextFileOutputStream.swift in Sources */,
 				585DA87826B024A900B8C587 /* CachedRelays.swift in Sources */,
 				584E96BD240FD4DA00D3334F /* Location.swift in Sources */,

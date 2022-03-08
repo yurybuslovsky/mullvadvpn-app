@@ -10,7 +10,7 @@ import Foundation
 import struct Network.IPv4Address
 import Logging
 
-class Pinger {
+final class Pinger {
     // Sender identifier passed along with ICMP packet.
     private let identifier: UInt16 = 757
 

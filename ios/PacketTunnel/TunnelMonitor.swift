@@ -22,23 +22,7 @@ protocol TunnelMonitorDelegate: AnyObject {
     func tunnelMonitor(_ tunnelMonitor: TunnelMonitor, networkReachabilityStatusDidChange isNetworkReachable: Bool)
 }
 
-struct TunnelMonitorConfiguration {
-    /// Interval at which to query the adapter for stats.
-    let wgStatsQueryInterval: DispatchTimeInterval = .milliseconds(50)
-
-    /// Interval for sending echo packets.
-    let pingInterval: DispatchTimeInterval = .seconds(3)
-
-    /// Delay before sending the first echo packet.
-    let pingStartDelay: DispatchTimeInterval = .milliseconds(500)
-
-    /// Interval after which connection is treated as being lost.
-    let connectionTimeout: TimeInterval = 15
-}
-
-class TunnelMonitor {
-    private let configuration = TunnelMonitorConfiguration()
-
+final class TunnelMonitor {
     private let adapter: WireGuardAdapter
     private let internalQueue = DispatchQueue(label: "TunnelMonitor")
     private let delegateQueue: DispatchQueue
@@ -140,7 +124,7 @@ class TunnelMonitor {
 
     private func startPinging(address: IPv4Address) -> Result<(), Pinger.Error> {
         let newPinger = Pinger(address: address, interfaceName: adapter.interfaceName)
-        let pingerResult = newPinger.start(delay: configuration.pingStartDelay, repeating: configuration.pingInterval)
+        let pingerResult = newPinger.start(delay: TunnelMonitorConfiguration.pingStartDelay, repeating: TunnelMonitorConfiguration.pingInterval)
 
         if case .success = pingerResult {
             pinger = newPinger
@@ -166,7 +150,7 @@ class TunnelMonitor {
         timer?.setEventHandler { [weak self] in
             self?.onWgStatsTimer()
         }
-        timer?.schedule(wallDeadline: .now(), repeating: configuration.wgStatsQueryInterval)
+        timer?.schedule(wallDeadline: .now(), repeating: TunnelMonitorConfiguration.wgStatsQueryInterval)
         timer?.resume()
 
         logger.debug("Set WG stats timer.")
@@ -218,7 +202,7 @@ class TunnelMonitor {
             return
         }
 
-        if let nextAttemptDate = lastAttemptDate?.addingTimeInterval(configuration.connectionTimeout), nextAttemptDate <= Date() {
+        if let nextAttemptDate = lastAttemptDate?.addingTimeInterval(TunnelMonitorConfiguration.connectionTimeout), nextAttemptDate <= Date() {
             // Reset the last recovery attempt date.
             lastAttemptDate = nextAttemptDate
 

@@ -44,7 +44,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     /// Tunnel status.
     private var tunnelStatus = PacketTunnelStatus(
         isNetworkReachable: true,
-        startMonitoringDate: nil,
+        connectingDate: nil,
         tunnelRelay: nil
     )
 
@@ -231,7 +231,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
         providerLogger.debug("Connection established.")
 
-        tunnelStatus.startMonitoringDate = nil
+        tunnelStatus.connectingDate = nil
 
         startTunnelCompletionHandler?(nil)
         startTunnelCompletionHandler = nil
@@ -294,7 +294,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
         // Adjust the start reconnect date if tunnel monitor re-started pinging in response to
         // network connectivity coming back up.
         if let startDate = tunnelMonitor.startDate {
-            tunnelStatus.startMonitoringDate = startDate
+            tunnelStatus.connectingDate = startDate
         }
     }
 
@@ -354,7 +354,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
 
         // Update tunnel status.
         tunnelStatus.tunnelRelay = newTunnelRelay
-        tunnelStatus.startMonitoringDate = nil
+        tunnelStatus.connectingDate = nil
 
         providerLogger.debug("Set tunnel relay to \(newTunnelRelay.hostname).")
 
@@ -410,8 +410,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelMonitorDelegate {
     private func startTunnelMonitor(gatewayAddress: IPv4Address) {
         tunnelMonitor.start(address: gatewayAddress)
 
-        // Mark when the tunnel started re-establishing connection.
-        tunnelStatus.startMonitoringDate = tunnelMonitor.startDate
+        // Mark when the tunnel started monitoring connection.
+        tunnelStatus.connectingDate = tunnelMonitor.startDate
     }
 
     /// Load relay cache with potential networking to refresh the cache and pick the relay for the
