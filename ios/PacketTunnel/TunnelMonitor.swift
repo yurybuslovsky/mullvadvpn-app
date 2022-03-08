@@ -47,6 +47,7 @@ class TunnelMonitor {
     private var pinger: Pinger?
     private var pathMonitor: NWPathMonitor?
     private var networkBytesReceived: UInt64 = 0
+    private var firstAttemptDate: Date?
     private var lastAttemptDate: Date?
     private var lastError: Pinger.Error?
     private var isPinging = false
@@ -65,6 +66,12 @@ class TunnelMonitor {
             return internalQueue.sync {
                 return _delegate
             }
+        }
+    }
+
+    var startDate: Date? {
+        return internalQueue.sync {
+            return firstAttemptDate
         }
     }
 
@@ -89,18 +96,6 @@ class TunnelMonitor {
         }
     }
 
-    /// Returns the date when the next recovery attempt will take place, otherwise nil.
-    func nextRecoveryAttemptDate() -> Date? {
-        return internalQueue.sync {
-            return lastAttemptDate.map { nextRecoveryAttemptDate(from: $0) }
-        }
-    }
-
-    /// Returns the date when the next recovery attempt will take place relative to the given date.
-    func nextRecoveryAttemptDate(from date: Date) -> Date {
-        return date.addingTimeInterval(configuration.connectionTimeout)
-    }
-
     private func startNoQueue(address pingAddress: IPv4Address) {
         if address == nil {
             logger.debug("Start tunnel monitor with address: \(pingAddress).")
@@ -112,7 +107,8 @@ class TunnelMonitor {
 
         address = pingAddress
         networkBytesReceived = 0
-        lastAttemptDate = Date()
+        firstAttemptDate = Date()
+        lastAttemptDate = firstAttemptDate
         lastError = nil
 
         let newPathMonitor = NWPathMonitor()
@@ -131,6 +127,7 @@ class TunnelMonitor {
         }
 
         address = nil
+        firstAttemptDate = nil
         lastAttemptDate = nil
         lastError = nil
 
@@ -221,9 +218,9 @@ class TunnelMonitor {
             return
         }
 
-        if let date = lastAttemptDate, nextRecoveryAttemptDate(from: date) <= Date() {
+        if let nextAttemptDate = lastAttemptDate?.addingTimeInterval(configuration.connectionTimeout), nextAttemptDate <= Date() {
             // Reset the last recovery attempt date.
-            lastAttemptDate = Date()
+            lastAttemptDate = nextAttemptDate
 
             // Reset last error.
             lastError = nil
@@ -249,7 +246,8 @@ class TunnelMonitor {
             switch startPinging(address: address) {
             case .success:
                 // Reset the last recovery attempt date.
-                lastAttemptDate = Date()
+                firstAttemptDate = Date()
+                lastAttemptDate = firstAttemptDate
 
                 // Start WG stats timer.
                 setWgStatsTimer()

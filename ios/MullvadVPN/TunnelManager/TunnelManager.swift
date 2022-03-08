@@ -14,12 +14,11 @@ import Logging
 import class WireGuardKit.PublicKey
 
 struct TunnelManagerConfiguration {
-    /// Tunnel status poll interval when the next reconnect date is not known and network is
-    /// reachable.
-    let networkReachableTunnelStatusPollInterval: TimeInterval = 2
+    /// Delay used before starting to poll the tunnel status (in seconds).
+    let tunnelStatusPollDelay: TimeInterval = 2
 
-    /// Tunnel status poll interval when network is unreachable.
-    let networkUnreachableTunnelStatusPollInterval: TimeInterval = 15
+    /// Interval between attempts to poll the tunnel status (in seconds).
+    let tunnelStatusPollInterval: TimeInterval = 5
 
     /// Private key rotation interval (in seconds).
     let privateKeyRotationInterval: TimeInterval = 60 * 60 * 24 * 4
@@ -62,7 +61,9 @@ final class TunnelManager: TunnelManagerStateDelegate {
     private var privateKeyRotationTimer: DispatchSourceTimer?
     private var isRunningPeriodicPrivateKeyRotation = false
 
-    private var tunnelStatusPollWork: DispatchWorkItem?
+    private var tunnelStatusPollTimer: DispatchSourceTimer?
+    private var isPolling = false
+    private var lastStartMonitoringDate: Date?
 
     var tunnelInfo: TunnelInfo? {
         return state.tunnelInfo
@@ -474,7 +475,7 @@ final class TunnelManager: TunnelManagerStateDelegate {
         case .connecting, .reconnecting:
             // Start polling tunnel status to keep the relay information up to date
             // while the tunnel process is trying to connect.
-            startPollingTunnelStatus(isNetworkReachable: newTunnelStatus.isNetworkReachable, reconnectDate: newTunnelStatus.reconnectAttemptDate)
+            startPollingTunnelStatus(startReconnectDate: newTunnelStatus.startMonitoringDate)
 
         case .pendingReconnect, .connected, .disconnecting, .disconnected:
             // Stop polling tunnel status once connection moved to final state.
@@ -631,56 +632,59 @@ final class TunnelManager: TunnelManagerStateDelegate {
 
     // MARK: - Tunnel status polling.
 
-    private func nextDateForPollingTunnelStatus(isNetworkReachable: Bool, reconnectDate: Date?) -> Date {
-        // When network is unreachable, poll the tunnel status using long intervals because packet
-        // tunnel will not attempt to recover connection until network is back up.
-        guard isNetworkReachable else {
-            return Date(timeIntervalSinceNow: configuration.networkUnreachableTunnelStatusPollInterval)
+    private func computeNextPollDate(startReconnectDate: Date?) -> Date {
+        // Compute the next date for polling relative to when the packet tunnel started
+        // re-establishing connection.
+        if let startReconnectDate = startReconnectDate {
+            let repeatInterval = configuration.tunnelStatusPollInterval
+            let delta = max(0, Date().timeIntervalSince(startReconnectDate))
+            let nextInterval = (floor(delta / repeatInterval) + 1) * repeatInterval
 
-        }
-
-        // When network is reachable, use reconnect date passed by packet tunnel to schedule
-        // the next tunnel status update.
-        if let reconnectDate = reconnectDate, reconnectDate > Date() {
-            return reconnectDate
+            return startReconnectDate.addingTimeInterval(nextInterval)
         } else {
-            // Do quick polling when reconnect date is either unavailable or stale to refresh
-            // the tunnel status.
-            return Date(timeIntervalSinceNow: configuration.networkReachableTunnelStatusPollInterval)
+            // Do quick polling when it's not known when the packet tunnel started re-establish
+            // connection.
+            return Date(timeIntervalSinceNow: configuration.tunnelStatusPollDelay)
         }
     }
 
-    private func startPollingTunnelStatus(isNetworkReachable: Bool, reconnectDate: Date?) {
-        // Compute date for polling tunnel status.
-        let pollDate = nextDateForPollingTunnelStatus(isNetworkReachable: isNetworkReachable, reconnectDate: reconnectDate)
+    private func startPollingTunnelStatus(startMonitoringDate: Date?) {
+        guard lastStartMonitoringDate != startMonitoringDate || !isPolling else { return }
 
-        logger.debug("Poll relay at \(pollDate.logFormatDate()).")
+        lastStartMonitoringDate = startMonitoringDate
+        isPolling = true
 
-        // Create work to refresh the tunnel.
-        let workItem = DispatchWorkItem { [weak self] in
+        let nextDate = computeNextPollDate(startReconnectDate: startMonitoringDate)
+        logger.debug("Start polling tunnel status at \(nextDate.logFormatDate()).")
+
+        let timer = DispatchSource.makeTimerSource(queue: stateQueue)
+        timer.setEventHandler { [weak self] in
             guard let self = self else { return }
 
             self.logger.debug("Refresh tunnel status (poll).")
             self.refreshTunnelStatus()
         }
 
-        // Schedule delayed work.
-        stateQueue.asyncAfter(wallDeadline: .now() + pollDate.timeIntervalSinceNow, execute: workItem)
+        timer.schedule(
+            wallDeadline: .now() + nextDate.timeIntervalSinceNow,
+            repeating: configuration.tunnelStatusPollInterval
+        )
 
-        // Cancel already scheduled work.
-        tunnelStatusPollWork?.cancel()
+        timer.resume()
 
-        // Store new work.
-        tunnelStatusPollWork = workItem
+        tunnelStatusPollTimer?.cancel()
+        tunnelStatusPollTimer = timer
     }
 
     private func cancelPollingTunnelStatus() {
-        if let pollRelayWork = tunnelStatusPollWork {
-            logger.debug("Cancel tunnel status polling.")
+        guard isPolling else { return }
 
-            pollRelayWork.cancel()
-            self.tunnelStatusPollWork = nil
-        }
+        logger.debug("Cancel tunnel status polling.")
+
+        tunnelStatusPollTimer?.cancel()
+        tunnelStatusPollTimer = nil
+        lastStartMonitoringDate = nil
+        isPolling = false
     }
 
 }

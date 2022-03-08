@@ -13,8 +13,8 @@ struct PacketTunnelStatus: Codable, Equatable {
     /// Flag indicating whether network is reachable.
     var isNetworkReachable: Bool
 
-    /// Date when the packet tunnel will attempt to reconnect using next relay.
-    var reconnectAttemptDate: Date?
+    /// When the packet tunnel started monitoring connection.
+    var startMonitoringDate: Date?
 
     /// Current relay.
     var tunnelRelay: PacketTunnelRelay?

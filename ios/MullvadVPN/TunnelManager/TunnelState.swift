@@ -13,8 +13,8 @@ struct TunnelStatus: Equatable, CustomStringConvertible {
     /// Whether netowork is reachable.
     var isNetworkReachable: Bool
 
-    /// When the next reconnect attempt will take place.
-    var reconnectAttemptDate: Date?
+    /// When the packet tunnel started monitoring connection.
+    var startMonitoringDate: Date?
 
     /// Tunnel state.
     var state: TunnelState
@@ -28,8 +28,8 @@ struct TunnelStatus: Equatable, CustomStringConvertible {
             s += "unreachable"
         }
 
-        if let reconnectAttemptDate = reconnectAttemptDate {
-            s += ", next reconnect on \(reconnectAttemptDate.logFormatDate())"
+        if let startMonitoringDate = startMonitoringDate {
+            s += ", monitoring connection since \(startMonitoringDate.logFormatDate())"
         }
 
         return s
@@ -38,7 +38,7 @@ struct TunnelStatus: Equatable, CustomStringConvertible {
     /// Updates the tunnel status from packet tunnel status, mapping relay to tunnel state.
     mutating func update(from packetTunnelStatus: PacketTunnelStatus, mappingRelayToState mapper: (PacketTunnelRelay?) -> TunnelState?) {
         isNetworkReachable = packetTunnelStatus.isNetworkReachable
-        reconnectAttemptDate = packetTunnelStatus.reconnectAttemptDate
+        startMonitoringDate = packetTunnelStatus.startReconnectDate
 
         if let newState = mapper(packetTunnelStatus.tunnelRelay) {
             state = newState
@@ -48,7 +48,7 @@ struct TunnelStatus: Equatable, CustomStringConvertible {
     /// Resets all fields to their defaults and assigns the next tunnel state.
     mutating func reset(to newState: TunnelState) {
         isNetworkReachable = true
-        reconnectAttemptDate = nil
+        startMonitoringDate = nil
         state = newState
     }
 }
