@@ -126,15 +126,17 @@ class SimulatorVPNConnection: NSObject, VPNConnectionProtocol {
         }
         set {
             lock.lock()
-            defer { lock.unlock() }
 
             if _status != newValue {
                 _status = newValue
 
                 // Send notification while holding the lock. This should enable the receiver
-                // to fetch the `SimulatorVPNConnection.status` before it changes.
+                // to fetch the `SimulatorVPNConnection.status` before the concurrent code gets
+                // opportunity to change it again.
                 postStatusDidChangeNotification()
             }
+
+            lock.unlock()
         }
     }
 
