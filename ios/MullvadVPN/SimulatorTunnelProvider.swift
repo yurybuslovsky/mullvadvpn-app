@@ -147,7 +147,6 @@ class SimulatorVPNConnection: NSObject, VPNConnectionProtocol {
         }
         set {
             lock.lock()
-            defer { lock.unlock() }
 
             if _reasserting != newValue {
                 _reasserting = newValue
@@ -158,6 +157,8 @@ class SimulatorVPNConnection: NSObject, VPNConnectionProtocol {
                     status = .connected
                 }
             }
+
+            lock.unlock()
         }
     }
 
@@ -264,6 +265,7 @@ class SimulatorTunnelProviderManager: VPNTunnelProviderManagerProtocol, Equatabl
     private var identifier: String {
         lock.lock()
         defer { lock.unlock() }
+
         return tunnelInfo.identifier
     }
 
@@ -313,6 +315,7 @@ class SimulatorTunnelProviderManager: VPNTunnelProviderManagerProtocol, Equatabl
         get {
             lock.lock()
             defer { lock.unlock() }
+
             return tunnelInfo.protocolConfiguration
         }
         set {
