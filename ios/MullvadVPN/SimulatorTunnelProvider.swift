@@ -138,7 +138,6 @@ class SimulatorVPNConnection: NSObject, VPNConnectionProtocol {
         }
     }
 
-    private var statusBeforeReasserting: NEVPNStatus?
     var reasserting: Bool {
         get {
             lock.lock()
@@ -154,11 +153,9 @@ class SimulatorVPNConnection: NSObject, VPNConnectionProtocol {
                 _reasserting = newValue
 
                 if newValue {
-                    statusBeforeReasserting = status
                     status = .reasserting
-                } else if let newStatus = statusBeforeReasserting {
-                    status = newStatus
-                    statusBeforeReasserting = nil
+                } else {
+                    status = .connected
                 }
             }
         }
