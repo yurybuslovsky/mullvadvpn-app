@@ -4,9 +4,12 @@ use crate::{
     tls_stream::TlsStream,
     AddressCache,
 };
-use futures::{channel::mpsc, future, pin_mut, StreamExt};
 #[cfg(target_os = "android")]
-use futures::{channel::oneshot, sink::SinkExt};
+use futures::sink::SinkExt;
+use futures::{
+    channel::{mpsc, oneshot},
+    future, pin_mut, StreamExt,
+};
 use http::uri::Scheme;
 use hyper::{
     client::connect::dns::{GaiResolver, Name},
@@ -49,21 +52,30 @@ pub struct HttpsConnectorWithSniHandle {
 
 impl HttpsConnectorWithSniHandle {
     /// Stop all streams produced by this connector
-    pub fn reset(&self) {
-        let _ = self.tx.unbounded_send(HttpsConnectorRequest::Reset);
+    pub async fn reset(&self) {
+        self.send_message(|tx| HttpsConnectorRequest::Reset(tx))
+            .await;
     }
 
     /// Change the proxy settings for the connector
-    pub fn set_connection_mode(&self, proxy: ApiConnectionMode) {
-        let _ = self
-            .tx
-            .unbounded_send(HttpsConnectorRequest::SetConnectionMode(proxy));
+    pub async fn set_connection_mode(&self, proxy: ApiConnectionMode) {
+        self.send_message(|tx| HttpsConnectorRequest::SetConnectionMode(proxy, tx))
+            .await;
+    }
+
+    async fn send_message(
+        &self,
+        make_cmd: impl FnOnce(oneshot::Sender<()>) -> HttpsConnectorRequest,
+    ) {
+        let (result_tx, result_rx) = oneshot::channel();
+        let _ = self.tx.unbounded_send(make_cmd(result_tx));
+        let _ = result_rx.await;
     }
 }
 
 enum HttpsConnectorRequest {
-    Reset,
-    SetConnectionMode(ApiConnectionMode),
+    Reset(oneshot::Sender<()>),
+    SetConnectionMode(ApiConnectionMode, oneshot::Sender<()>),
 }
 
 #[derive(Clone)]
@@ -149,10 +161,12 @@ impl HttpsConnectorWithSni {
         tokio::spawn(async move {
             // Handle requests by `HttpsConnectorWithSniHandle`s
             while let Some(request) = rx.next().await {
-                let handles = {
-                    let mut inner = inner_copy.lock().unwrap();
+                // Avoid doing too much blocking work while holding this mutex.
+                let mut inner = inner_copy.lock().unwrap();
 
-                    if let HttpsConnectorRequest::SetConnectionMode(config) = request {
+                let complete_tx = match request {
+                    HttpsConnectorRequest::Reset(complete_tx) => complete_tx,
+                    HttpsConnectorRequest::SetConnectionMode(config, complete_tx) => {
                         match InnerConnectionMode::try_from(config) {
                             Ok(config) => {
                                 inner.proxy_config = config;
@@ -166,14 +180,20 @@ impl HttpsConnectorWithSni {
                                 );
                             }
                         }
+                        complete_tx
                     }
-
-                    std::mem::take(&mut inner.stream_handles)
                 };
+
+                // Close all sockets and restart active attempts to connect
+                let handles = std::mem::take(&mut inner.stream_handles);
+                drop(inner);
+
                 for handle in handles {
                     handle.close();
                 }
                 notify.notify_waiters();
+
+                let _ = complete_tx.send(());
             }
         });
 

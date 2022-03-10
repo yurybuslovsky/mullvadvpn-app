@@ -141,10 +141,9 @@ impl<
             socket_bypass_tx.clone(),
         );
 
-        proxy_config_provider
-            .next()
-            .await
-            .map(|config| connector_handle.set_connection_mode(config));
+        if let Some(config) = proxy_config_provider.next().await {
+            connector_handle.set_connection_mode(config).await;
+        }
 
         let (command_tx, command_rx) = mpsc::unbounded();
         let client = Client::builder().build(connector);
@@ -207,8 +206,9 @@ impl<
                 };
                 tokio::spawn(future);
             }
-            RequestCommand::Reset => {
-                self.connector_handle.reset();
+            RequestCommand::Reset(done_tx) => {
+                self.connector_handle.reset().await;
+                let _ = done_tx.send(());
             }
             RequestCommand::NextApiConfig => {
                 if let Some(new_config) = self.proxy_config_provider.next().await {
@@ -218,7 +218,7 @@ impl<
                     };
                     // Switch to new connection mode unless rejected by address change callback
                     if (self.new_address_callback)(endpoint).await {
-                        self.connector_handle.set_connection_mode(new_config);
+                        self.connector_handle.set_connection_mode(new_config).await;
                     }
                 }
             }
@@ -229,7 +229,7 @@ impl<
         while let Some(command) = self.command_rx.next().await {
             self.process_command(command).await;
         }
-        self.connector_handle.reset();
+        self.connector_handle.reset().await;
     }
 }
 
@@ -242,7 +242,9 @@ pub struct RequestServiceHandle {
 impl RequestServiceHandle {
     /// Resets the corresponding RequestService, dropping all in-flight requests.
     pub async fn reset(&self) {
-        let _ = self.tx.unbounded_send(RequestCommand::Reset);
+        let (done_tx, done_rx) = oneshot::channel();
+        let _ = self.tx.unbounded_send(RequestCommand::Reset(done_tx));
+        let _ = done_rx.await;
     }
 
     /// Submits a `RestRequest` for exectuion to the request service.
@@ -261,7 +263,7 @@ pub(crate) enum RequestCommand {
         RestRequest,
         oneshot::Sender<std::result::Result<Response, Error>>,
     ),
-    Reset,
+    Reset(oneshot::Sender<()>),
     NextApiConfig,
 }
 
