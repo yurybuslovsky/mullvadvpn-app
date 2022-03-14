@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		563BD85A27DF7C530015B7AB /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 563BD85927DF7C530015B7AB /* Intents.intentdefinition */; };
 		5801C9A527A14B2A0031566A /* TunnelManagerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5801C9A427A14B2A0031566A /* TunnelManagerState.swift */; };
 		5806766B27048E3C00C858CB /* AnyOptional.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58E1337026D2BE9C00CC316B /* AnyOptional.swift */; };
 		5806766C27048E3E00C858CB /* AnyOptional.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58E1337026D2BE9C00CC316B /* AnyOptional.swift */; };
@@ -378,6 +379,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		563BD85927DF7C530015B7AB /* Intents.intentdefinition */ = {isa = PBXFileReference; lastKnownFileType = file.intentdefinition; path = Intents.intentdefinition; sourceTree = "<group>"; };
 		5801C9A427A14B2A0031566A /* TunnelManagerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelManagerState.swift; sourceTree = "<group>"; };
 		5807E2BF2432038B00F5FF30 /* String+Split.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String+Split.swift"; sourceTree = "<group>"; };
 		5807E2C1243203D000F5FF30 /* StringTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StringTests.swift; sourceTree = "<group>"; };
@@ -661,6 +663,14 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		563BD85827DF7AEF0015B7AB /* Siri */ = {
+			isa = PBXGroup;
+			children = (
+				563BD85927DF7C530015B7AB /* Intents.intentdefinition */,
+			);
+			path = Siri;
+			sourceTree = "<group>";
+		};
 		58095C49275FA24800890776 /* AddressCache */ = {
 			isa = PBXGroup;
 			children = (
@@ -897,6 +907,7 @@
 				58A1AA8B23F5584B009F7EA6 /* ConnectionPanelView.swift */,
 				58B43C1825F77DB60002C8C3 /* ConnectMainContentView.swift */,
 				58CCA00F224249A1004F3011 /* ConnectViewController.swift */,
+				563BD85827DF7AEF0015B7AB /* Siri */,
 				584592602639B4A200EF967F /* ConsentContentView.swift */,
 				58A99ED2240014A0006599E9 /* ConsentViewController.swift */,
 				5871FB95254ADE4E0051A0A4 /* ConsolidatedApplicationLog.swift */,
@@ -1439,6 +1450,7 @@
 				5806767927048E8800C858CB /* Keychain.swift in Sources */,
 				5846227526E22A350035F7C2 /* AnyAppStorePaymentObserver.swift in Sources */,
 				588527B4276B4F2F00BAA373 /* SetAccountOperation.swift in Sources */,
+				563BD85A27DF7C530015B7AB /* Intents.intentdefinition in Sources */,
 				585CA70F25F8C44600B47C62 /* UIMetrics.swift in Sources */,
 				58095C592762155700890776 /* RESTRetryStrategy.swift in Sources */,
 				5840250422B11AB700E4CFEC /* MullvadEndpoint.swift in Sources */,

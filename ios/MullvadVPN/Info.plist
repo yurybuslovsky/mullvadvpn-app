@@ -30,6 +30,10 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>ToggleVPNIntent</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
